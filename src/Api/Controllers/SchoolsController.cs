@@ -9,75 +9,46 @@ namespace Oz.Api.Controllers;
 [Route("api/v1/admin/[controller]")]
 public class SchoolsController : ControllerBase
 {
-    private readonly IRepository<School> _schoolRepository;
+    private readonly IRepository<School> _repository;
 
-    public SchoolsController(IRepository<School> schoolRepository)
+    public SchoolsController(IRepository<School> repository)
     {
-        _schoolRepository = schoolRepository;
+        _repository = repository;
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(SchoolDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateSchoolDto dto, CancellationToken ct)
     {
-        var entity = new School
+        var school = new School
         {
             Name = dto.Name,
             NameAr = dto.NameAr,
             Slug = dto.Slug,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        var created = await _schoolRepository.AddAsync(entity, ct);
+        await _repository.AddAsync(school, ct);
 
-        var result = MapToDto(created);
-
-        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-    }
-
-    [HttpGet("{id}")]
-    [ProducesResponseType(typeof(SchoolDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(long id, CancellationToken ct)
-    {
-        var school = await _schoolRepository.GetByIdAsync(id, ct);
-        if (school == null)
-            return NotFound();
-
-        return Ok(MapToDto(school));
+        var result = new SchoolDto(school.Id, school.Name, school.NameAr, school.Slug, school.IsActive, school.CreatedAt);
+        return CreatedAtAction(nameof(GetById), new { id = school.Id }, result);
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<SchoolDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List([FromQuery] int page = 1, [FromQuery] int page_size = 20, CancellationToken ct = default)
     {
-        page = Math.Max(1, page);
-        page_size = Math.Clamp(page_size, 1, 100);
-
-        var result = await _schoolRepository.ListAsync(page, page_size, ct);
-
-        var dto = new PagedResult<SchoolDto>
-        {
-            Items = result.Items.Select(MapToDto).ToList(),
-            Total = result.Total,
-            Page = result.Page,
-            PageSize = result.PageSize,
-        };
-
-        return Ok(dto);
+        var result = await _repository.ListAsync(page, page_size, ct);
+        var dtos = result.Items.Select(s => new SchoolDto(s.Id, s.Name, s.NameAr, s.Slug, s.IsActive, s.CreatedAt)).ToList();
+        return Ok(new { items = dtos, result.Total, result.Page, result.PageSize });
     }
 
-    private static SchoolDto MapToDto(School school) => new()
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> GetById(long id, CancellationToken ct)
     {
-        Id = school.Id,
-        Name = school.Name,
-        NameAr = school.NameAr,
-        Slug = school.Slug,
-        IsActive = school.IsActive,
-        CreatedAt = school.CreatedAt,
-        UpdatedAt = school.UpdatedAt,
-    };
+        var school = await _repository.GetByIdAsync(id, ct);
+        if (school is null) return NotFound();
+        var dto = new SchoolDto(school.Id, school.Name, school.NameAr, school.Slug, school.IsActive, school.CreatedAt);
+        return Ok(dto);
+    }
 }

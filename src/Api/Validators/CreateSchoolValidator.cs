@@ -8,16 +8,16 @@ public class CreateSchoolValidator : AbstractValidator<CreateSchoolDto>
     public CreateSchoolValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("School name is required.")
-            .MaximumLength(200).WithMessage("School name must not exceed 200 characters.");
+            .NotEmpty().WithMessage("Name is required")
+            .MaximumLength(200).WithMessage("Name must not exceed 200 characters");
 
         RuleFor(x => x.NameAr)
-            .NotEmpty().WithMessage("Arabic school name is required.")
-            .MaximumLength(200).WithMessage("Arabic school name must not exceed 200 characters.");
+            .NotEmpty().WithMessage("Arabic name is required")
+            .MaximumLength(200).WithMessage("Arabic name must not exceed 200 characters");
 
         RuleFor(x => x.Slug)
-            .NotEmpty().WithMessage("Slug is required.")
-            .MaximumLength(200).WithMessage("Slug must not exceed 200 characters.")
-            .Matches("^[a-z0-9-]+$").WithMessage("Slug must contain only lowercase letters, numbers, and hyphens.");
+            .NotEmpty().WithMessage("Slug is required")
+            .MaximumLength(200).WithMessage("Slug must not exceed 200 characters")
+            .Matches("^[a-z0-9]+(-[a-z0-9]+)*$").WithMessage("Slug must be lowercase alphanumeric with hyphens");
     }
 }
