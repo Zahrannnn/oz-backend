@@ -6,6 +6,7 @@ using Oz.Infrastructure.Data;
 namespace Oz.Api.Controllers;
 
 [ApiController]
+[Tags("Health")]
 [Route("api/v1/[controller]")]
 public class ReadyzController : ControllerBase
 {
