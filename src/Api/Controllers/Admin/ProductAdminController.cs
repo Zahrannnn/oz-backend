@@ -221,6 +221,36 @@ public class ProductAdminController : ControllerBase
         return Ok(variant);
     }
 
+    [HttpPut("/api/v1/admin/variants/{id:long}/stock")]
+    public async Task<IActionResult> UpdateStock(long id, [FromBody] UpdateStockRequest request)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        var variant = await _db.Variants
+            .FromSqlRaw("SELECT * FROM variant WITH (UPDLOCK, ROWLOCK) WHERE id = {0}", id)
+            .FirstOrDefaultAsync();
+
+        if (variant == null) return NotFound();
+
+        var oldStock = variant.Stock;
+        var before = JsonSerializer.Serialize(variant);
+
+        variant.Stock = request.Stock;
+        if (request.Threshold.HasValue)
+            variant.LowStockThreshold = request.Threshold.Value;
+        variant.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        var after = JsonSerializer.Serialize(variant);
+        await _auditLog.WriteAsync(GetActorId(), "stock.edit", "variant", id.ToString(), before, after, request.Reason);
+
+        // TODO: if (oldStock == 0 && request.Stock > 0) enqueue SendNotifyMeEmailsJob
+
+        return Ok(variant);
+    }
+
     private static AdminProductDto ToDto(Product p) => new(
         p.Id, p.SchoolId, p.GradeStageId, p.ItemTypeId,
         (byte)p.Gender, p.Color, p.IsInSet, p.IsArchived);
@@ -253,3 +283,5 @@ public record UpdateVariantRequest(
     int Stock,
     int Reserved,
     int LowStockThreshold);
+
+public record UpdateStockRequest(int Stock, string? Reason = null, int? Threshold = null);
