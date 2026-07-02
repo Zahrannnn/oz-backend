@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Hangfire;
 using Oz.Infrastructure.Data;
 using Oz.Infrastructure.Repositories;
@@ -37,6 +38,8 @@ builder.Services.AddControllers()
         };
     });
 
+// Swagger / OpenAPI
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
 // EF Core + SQL Server
@@ -59,8 +62,9 @@ builder.Services.AddCors(options =>
     });
 });
 
-// FluentValidation
+// FluentValidation - register validators + auto-validate on controller actions
 builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+builder.Services.AddFluentValidationAutoValidation();
 
 // Hangfire - MSSQL-backed job storage
 builder.Services.AddHangfire(config =>
@@ -81,10 +85,38 @@ app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseSecurityHeaders();
 app.UseCors();
 
+// OpenAPI spec endpoint
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// Swagger UI - serves HTML from CDN, reads spec from built-in OpenAPI
+app.MapGet("/swagger", () => Results.Content("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oz Backend API - Swagger UI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                url: "/openapi/v1.json",
+                dom_id: "#swagger-ui",
+                presets: [SwaggerUIBundle.presets.apis],
+                layout: "BaseLayout"
+            });
+        };
+    </script>
+</body>
+</html>
+""", "text/html; charset=utf-8")).ExcludeFromDescription();
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
