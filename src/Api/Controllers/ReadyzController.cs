@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Oz.Infrastructure.Data;
 
@@ -22,7 +23,6 @@ public class ReadyzController : ControllerBase
     {
         var failures = new List<string>();
 
-        // (a) MSSQL reachable
         try
         {
             await _dbContext.Database.CanConnectAsync();
@@ -33,15 +33,15 @@ public class ReadyzController : ControllerBase
             failures.Add("mssql_unreachable");
         }
 
-        // (b) Hangfire schema initialized - check for Hangfire tables
         if (failures.Count == 0)
         {
             try
             {
-                var hangfireExists = await _dbContext.Database
-                    .ExecuteSqlRawAsync(
-                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Job'") > 0;
-                if (!hangfireExists)
+                using var connection = new SqlConnection(_dbContext.Database.GetConnectionString());
+                await connection.OpenAsync();
+                using var command = new SqlCommand("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Job'", connection);
+                var count = (int)(await command.ExecuteScalarAsync())!;
+                if (count == 0)
                 {
                     failures.Add("hangfire_schema_missing");
                 }
@@ -53,7 +53,6 @@ public class ReadyzController : ControllerBase
             }
         }
 
-        // (c) Bosta API key env var set
         var bostaKey = Environment.GetEnvironmentVariable("Bosta__ApiKey");
         if (string.IsNullOrWhiteSpace(bostaKey))
         {
