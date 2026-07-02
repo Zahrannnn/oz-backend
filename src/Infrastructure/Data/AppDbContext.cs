@@ -223,8 +223,13 @@ public class AppDbContext : DbContext
             e.Property(x => x.CancelledAt).HasColumnName("cancelled_at").HasColumnType("datetime2(3)");
             e.Property(x => x.DeliveredAt).HasColumnName("delivered_at").HasColumnType("datetime2(3)");
             e.Property(x => x.PickedUpAt).HasColumnName("picked_up_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.HandedToCourierAt).HasColumnName("handed_to_courier_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.InTransitAt).HasColumnName("in_transit_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.ReturnedAt).HasColumnName("returned_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.CodFailedAt).HasColumnName("cod_failed_at").HasColumnType("datetime2(3)");
 
             e.HasIndex(x => x.TrackingTokenHash).IsUnique();
+            e.HasIndex(x => x.BostaTrackingId).IsUnique().HasFilter("[bosta_tracking_id] IS NOT NULL");
             e.HasIndex(x => new { x.State, x.StateChangedAt }).HasFilter("[state] IN (1, 2, 8)");
             e.HasIndex(x => x.CustomerPhone);
             e.HasIndex(x => x.CreatedAt);

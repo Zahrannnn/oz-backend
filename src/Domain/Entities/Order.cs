@@ -41,6 +41,10 @@ public class Order
     public DateTime? CancelledAt { get; set; }
     public DateTime? DeliveredAt { get; set; }
     public DateTime? PickedUpAt { get; set; }
+    public DateTime? HandedToCourierAt { get; set; }
+    public DateTime? InTransitAt { get; set; }
+    public DateTime? ReturnedAt { get; set; }
+    public DateTime? CodFailedAt { get; set; }
 
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
 }
