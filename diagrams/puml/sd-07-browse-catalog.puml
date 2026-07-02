@@ -1,0 +1,101 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+skinparam participant<<Cloud>> {
+  BorderColor #1ABC9C
+  BackgroundColor #D1F2EB
+  FontColor #1ABC9C
+  FontSize 12
+}
+
+title "sd-07 — Browse Catalog (SSR + ISR Hybrid Fetch)"
+
+actor "Parent" as Parent
+participant "Next.js\n(Vercel Edge)" as FE
+participant "Vercel ISR Cache" as Cache <<Cloud>>
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+
+== Landing Page — Schools (ISR) ==
+
+Parent -> FE: GET /
+activate FE
+
+FE -> Cache: Check ISR cache for\n/stores/schools
+activate Cache
+
+alt Cache valid (not stale)
+  Cache --> FE: Cached HTML (schools list)
+else Cache stale or miss
+  deactivate Cache
+  FE -> API: GET /v1/schools
+  activate API
+  API -> DB: SELECT id, name_ar,\nsort_order FROM school\nWHERE is_active = 1\nORDER BY sort_order
+  activate DB
+  DB --> API: [ { id, name_ar }, ... ]
+  deactivate DB
+  API --> FE: 200 [ { id, name_ar }, ... ]
+  deactivate API
+  FE -> FE: Render HTML + set ISR\nrevalidate timer
+  FE -> Cache: Store rendered page
+  activate Cache
+  deactivate Cache
+end
+
+FE --> Parent: Schools page (full HTML)
+deactivate FE
+
+== Select School — Products by Grade ==
+
+Parent -> FE: Click school "ابن خلدون"
+activate FE
+
+FE -> API: GET /v1/schools/{id}/grades\nInclude products with stock
+activate API
+
+API -> DB: SELECT g.id, g.name_ar,\ng.sort_order\nFROM grade_stage g\nWHERE g.school_id = schoolId\nORDER BY g.sort_order
+activate DB
+DB --> API: grade list
+deactivate DB
+
+loop for each grade
+  API -> DB: SELECT p.id, p.name_ar,\np.description_ar, p.slug,\np.is_set\nFROM product p\nJOIN product_grade pg ON pg.product_id = p.id\nWHERE pg.grade_stage_id = gradeId\nAND p.is_active = 1
+  activate DB
+  DB --> API: [ { id, name_ar, is_set }, ... ]
+  deactivate DB
+
+  API -> DB: SELECT v.id, v.size, v.stock,\nv.price_incl_vat\nFROM variant v\nWHERE v.product_id IN (productIds)\nORDER BY v.size
+  activate DB
+  DB --> API: variant stock+price
+  deactivate DB
+end
+
+note right: This is the expensive\nquery path. Consider:\n- JSON FOR PATH aggregation\n- Redis cache for grade\n+product+variant tree
+
+API --> FE: 200 { grades: [ { grade, products: [ { product, variants } ] } ] }
+deactivate API
+
+FE -> FE: Client-render product grid\nwith stock badge (in_stock / low / oos)
+FE --> Parent: Product grid by grade
+deactivate FE
+
+@enduml

@@ -1,0 +1,76 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-10 — Parent Requests Notify-Me (Out-of-Stock)"
+
+actor "Parent" as Parent
+participant "Next.js Frontend\n(Vercel)" as FE
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+
+== Parent Lands on OOS Product ==
+
+Parent -> FE: View product detail page\nvariant shows "Out of Stock"
+activate FE
+FE --> Parent: "Notify me when available"\nemail input field shown
+deactivate FE
+
+== Parent Subscribes ==
+
+Parent -> FE: Enter email + click "Notify Me"
+activate FE
+
+FE -> API: POST /v1/variants/{id}/notify-me\n{ email }
+activate API
+
+API -> DB: SELECT stock, id\nFROM variant WHERE id = variantId
+activate DB
+DB --> API: { stock: 0, id }
+deactivate DB
+
+alt stock > 0
+  API --> FE: 409 Conflict\n{ error: 'Variant is in stock.\nAdd to cart instead.' }
+else already subscribed
+  API -> DB: SELECT id FROM pending_alert\nWHERE variant_id = variantId\nAND email = emailHash\nAND notified = false
+  activate DB
+  DB --> API: { id }
+  deactivate DB
+  API --> FE: 409 Conflict\n{ error: 'Already subscribed\nfor this item.' }
+else
+  API -> DB: INSERT pending_alert\n(variant_id, email,\nemail_hash, created_at,\nnotified = false)
+  activate DB
+  deactivate DB
+
+  API -> DB: INSERT audit_log\n(action='variant.notify_me_request',\nvariant_id=variantId, email_hash)
+  activate DB
+  deactivate DB
+
+  API --> FE: 201 Created\n{ message: 'You will be notified\nwhen back in stock.' }
+end
+
+deactivate API
+
+FE --> Parent: Success / Error message
+deactivate FE
+
+@enduml

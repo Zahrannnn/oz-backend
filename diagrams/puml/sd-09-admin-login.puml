@@ -1,0 +1,75 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-09 — Admin Login (JWT, No Refresh Token)"
+
+actor "Administrator" as Admin
+participant "Next.js Frontend\n(Vercel)" as FE
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+
+Admin -> FE: Navigate to /admin
+activate FE
+
+FE -> FE: Check for existing auth cookie
+note right: No JWT cookie found\n→ redirect to login
+
+FE --> Admin: Login page (email + password)
+deactivate FE
+
+Admin -> FE: Enter credentials + submit
+activate FE
+
+FE -> API: POST /v1/auth/login\n{ email, password }
+activate API
+
+API -> DB: SELECT id, email, password_hash,\npassword_salt, role,\nfailed_attempts, locked_until\nFROM admin WHERE email = ?
+activate DB
+DB --> API: { id, password_hash, salt, failed_attempts, locked_until }
+deactivate DB
+
+alt account locked AND locked_until > NOW()
+  API --> FE: 423 Locked\n{ error: 'Account locked.\nTry again after ' + locked_until }
+else password does not match
+  API -> DB: UPDATE admin\nSET failed_attempts = failed_attempts + 1\nWHERE id = adminId
+  API -> DB: If failed_attempts >= 5:\nUPDATE admin\nSET locked_until = DATEADD(MINUTE, 15, NOW())
+  API --> FE: 401 Unauthorized\n{ error: 'Invalid credentials' }
+else password matches
+  API -> DB: UPDATE admin\nSET failed_attempts = 0,\nlocked_until = NULL,\nlast_login_at = NOW()
+
+  API -> API: Generate JWT\n(sub=adminId, role=admin,\niat=NOW, exp=NOW+8h)\nHMAC-SHA256 with secret
+
+  API -> DB: INSERT audit_log\n(action='admin.login',\nactor='admin', admin_id=adminId)
+
+  API --> FE: 200 OK\nSet-Cookie: jwt=<token>;\nHttpOnly; Secure; SameSite=Strict;\nPath=/admin; Max-Age=28800
+end
+
+deactivate API
+
+FE -> FE: Save cookie, redirect\nadmin to dashboard
+FE --> Admin: Dashboard page
+deactivate FE
+
+note right: Every subsequent API call reads JWT from cookie.\n8h sliding window — cookie Max-Age resets on each request.\nNo refresh token. On expiry → redirect to login page.
+
+@enduml

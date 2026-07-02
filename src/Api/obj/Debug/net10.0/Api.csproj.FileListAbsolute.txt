@@ -1,0 +1,8 @@
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.csproj.AssemblyReference.cache
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\rpswa.dswa.cache.json
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.GeneratedMSBuildEditorConfig.editorconfig
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.AssemblyInfoInputs.cache
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.AssemblyInfo.cs
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.csproj.CoreCompileInputs.cache
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.MvcApplicationPartsAssemblyInfo.cs
+D:\my-business\oz-backend\src\Api\obj\Debug\net10.0\Api.MvcApplicationPartsAssemblyInfo.cache

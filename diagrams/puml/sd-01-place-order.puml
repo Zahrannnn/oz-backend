@@ -1,0 +1,91 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+skinparam collections {
+  BorderColor #D35400
+  BackgroundColor #FAD7A0
+  FontColor #D35400
+  FontSize 12
+}
+
+title "sd-01 — Place Order (Happy Path)"
+
+actor "Parent" as Parent
+participant "Next.js Frontend\n(Vercel)" as FE
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+collections "Hangfire\nJob Queue" as HF
+actor "SMTP\n(Gmail)" as SMTP
+
+Parent -> FE: Checkout form submit\n(name, phone, email, address, items)
+activate FE
+
+FE -> API: POST /api/v1/orders\n{ channel, customer, items }
+activate API
+
+API -> DB: BEGIN TRANSACTION
+activate DB
+
+API -> DB: SELECT stock, price_incl_vat\nFROM variant\nWITH (UPDLOCK, ROWLOCK)\nWHERE id = ?
+note right: Row locked for\ntx duration. Prevents\nconcurrent oversell.
+
+DB --> API: { stock, price }
+
+API -> API: Check stock >= qty\nfor each variant
+
+== Stock OK ==
+
+API -> DB: INSERT orders\n(state='placed', token_hash,\ncustomer fields, total)
+
+API -> DB: INSERT order_items\n(variant_id, qty,\nunit_price_snapshot,\nline_total_snapshot)
+
+API -> DB: UPDATE variant\nSET stock = stock - qty\nWHERE id = ?
+
+API -> DB: INSERT audit_log\n(action='order.created',\nactor='parent')
+
+API -> DB: COMMIT
+note right: Stock atomically\ndeducted. Token URL\ngenerated in API.
+
+deactivate DB
+
+API -> HF: Enqueue Job:\nSendOrderConfirmationEmail
+
+API --> FE: 201 Created\n{ orderId, token, trackingUrl, total }
+deactivate API
+
+FE --> Parent: Confirmation page\n"Save this link to track\nyour order"
+deactivate FE
+
+== Later (async via Hangfire) ==
+
+HF -> API: Dequeue & process job
+activate API
+
+API -> SMTP: Send order-confirmation\nemail with token URL
+activate SMTP
+SMTP --> API: 200 OK
+deactivate SMTP
+
+API -> DB: INSERT email_log\n(template='order_confirmation',\nstatus='sent')
+deactivate API
+
+@enduml

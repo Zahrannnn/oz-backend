@@ -1,0 +1,109 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+skinparam actorBorderColor #2980B9
+skinparam actorBackgroundColor #3498DB
+skinparam actorFontColor #FFFFFF
+skinparam actorFontSize 14
+
+title "sd-02 — Bosta Pickup Booking + Delivery Webhook"
+
+actor "Administrator" as Admin
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+participant "Bosta\nSystem" as Bosta
+actor "SMTP\n(Gmail)" as SMTP
+
+== Admin Books Bosta Pickup ==
+
+Admin -> API: POST /orders/{id}/bosta-pickup
+activate API
+
+API -> DB: SELECT order WHERE id = ?\nAND state = 'ready_to_ship'
+activate DB
+DB --> API: { order, customer, address, codAmount }
+deactivate DB
+
+API -> Bosta: POST /api/shipments\n{customer, address, codAmount}
+activate Bosta
+Bosta --> API: { trackingId: "BST-12345" }
+deactivate Bosta
+
+API -> DB: BEGIN TRANSACTION
+activate DB
+API -> DB: UPDATE order\nSET state = 'handed_to_courier',\nbosta_tracking_id = 'BST-12345',\nstate_changed_at = NOW()
+
+API -> DB: INSERT audit_log\n(action='order.bosta_pickup',\nbosta_id='BST-12345')
+
+API -> DB: COMMIT
+deactivate DB
+
+API -> SMTP: Send order-shipped email\nwith token URL
+API --> Admin: 200 OK\n{ bostaTrackingId, newState }
+deactivate API
+
+== Bosta Delivers to Parent ==
+
+Bosta -> API: POST /api/v1/webhooks/bosta\n{ trackingId: "BST-12345",\n  status: "delivered" }
+note right
+  HMAC-SHA256 signature
+  verified against shared secret.
+  401 if mismatch.
+end note
+
+activate API
+
+API -> DB: SELECT order\nWHERE bosta_tracking_id = 'BST-12345'
+activate DB
+DB --> API: { id, state: 'in_transit' }
+deactivate DB
+
+alt state == 'in_transit' AND status == 'delivered'
+  API -> DB: BEGIN TRANSACTION
+  activate DB
+  API -> DB: UPDATE order\nSET state = 'delivered',\ndelivered_at = NOW()
+  API -> DB: UPDATE order\nSET state = 'closed_success'
+  API -> DB: INSERT audit_log\n(action='order.delivered',\nwebhook='bosta')
+  API -> DB: COMMIT
+  deactivate DB
+
+  API -> SMTP: Send delivery-confirmation\nemail
+  API --> Bosta: 200 OK
+else status == 'cod_failed'
+  API -> DB: UPDATE order\nSET state = 'cod_failed'
+  API -> DB: INSERT audit_log\n(action='order.cod_failed',\nwebhook='bosta')
+  API -> SMTP: Send COD-failure email
+  API --> Bosta: 200 OK
+else status == 'returned_to_store'
+  API -> DB: UPDATE order\nSET state = 'returned_to_store'
+  API -> DB: UPDATE variant\nSET stock = stock + qty\nFOR EACH order_item
+  API -> DB: UPDATE order\nSET state = 'closed_failed'
+  API -> DB: INSERT audit_log\n(action='order.returned')
+  API -> SMTP: Send return notification
+  API --> Bosta: 200 OK
+else
+  API --> Bosta: 422 Unprocessable
+end
+
+deactivate API
+
+@enduml

@@ -1,0 +1,76 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-06 — Notify-Me Restock Flow"
+
+actor "Administrator" as Admin
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+actor "SMTP\n(Gmail)" as SMTP
+
+Admin -> API: PUT /variants/{id}/stock\n{ stock: 10 }
+activate API
+
+API -> DB: SELECT id, stock, threshold\nFROM variant WHERE id = ?
+activate DB
+DB --> API: { stock: 0, threshold: 5 }
+deactivate DB
+
+note right: Old stock was 0.\nNew stock is 10.\nDiff: crossed from 0 to >0.
+
+alt old_stock <= 0 AND new_stock > 0
+  API -> DB: BEGIN TRANSACTION
+  activate DB
+
+  API -> DB: UPDATE variant\nSET stock = 10\nWHERE id = ?
+
+  note right: Detect crossing zero →\nnotify-me trigger
+
+  API -> DB: INSERT audit_log\n(action='variant.stock_updated',\nold=0, new=10,\ntriggered_notify_me=true)
+
+  API -> DB: COMMIT
+  deactivate DB
+
+  API -> DB: SELECT pe.email, pe.variant_id,\npe.created_at\nFROM pending_alert pe\nWHERE pe.variant_id = variantId\nAND pe.notified = false
+  activate DB
+  DB --> API: [ { email: 'a@b.com' }, ... ]
+  deactivate DB
+
+  loop for each pending alert
+    API -> SMTP: Send notify-me email\n"Product back in stock!"
+    API -> DB: UPDATE pending_alert\nSET notified = true,\nnotified_at = NOW()
+  end
+
+  API --> Admin: 200 OK\n{ stock: 10,\nnotifyMeTriggered: true,\nnotificationsSent: 2 }
+
+else
+  API -> DB: UPDATE variant\nSET stock = 10\nWHERE id = ?
+  activate DB
+  deactivate DB
+
+  API --> Admin: 200 OK\n{ stock: 10,\nnotifyMeTriggered: false }
+end
+
+deactivate API
+
+@enduml

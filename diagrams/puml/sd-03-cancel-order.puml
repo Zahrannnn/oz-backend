@@ -1,0 +1,71 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-03 — Parent Cancels Order (Pre-Handoff)"
+
+actor "Parent" as Parent
+participant "Next.js Frontend\n(Vercel)" as FE
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+actor "SMTP\n(Gmail)" as SMTP
+
+Parent -> FE: Click "Cancel" on\norder status page
+activate FE
+
+FE -> API: POST /v1/orders/by-token/{token}/cancel\n{ reason?: "Changed mind" }
+activate API
+
+API -> DB: SELECT o.state, oi.variant_id, oi.qty\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.id\nWHERE o.token_hash = HASHBYTES('SHA2_256', token)
+activate DB
+DB --> API: { state, items: [{ variant_id, qty }] }
+deactivate DB
+
+alt state IN ('placed', 'ready_to_ship', 'ready_for_pickup')
+  API -> DB: BEGIN TRANSACTION
+  activate DB
+
+  API -> DB: UPDATE orders\nSET state = 'cancelled',\ncancelled_at = NOW()
+
+  loop for each order_item
+    API -> DB: UPDATE variant\nSET stock = stock + qty\nWHERE id = variant_id
+    note right: Stock restored atomically
+  end
+
+  API -> DB: INSERT audit_log\n(action='order.cancelled_by_parent',\nreason=reason)
+
+  API -> DB: COMMIT
+  deactivate DB
+
+  API -> SMTP: Send cancellation email\nwith returned-items summary
+  API --> FE: 200 OK\n{ state: 'cancelled' }
+
+else
+  API --> FE: 409 Conflict\n{ error: 'Order cannot be cancelled\nin state: ' + state }
+end
+
+deactivate API
+
+FE --> Parent: Success / Error message
+deactivate FE
+
+@enduml

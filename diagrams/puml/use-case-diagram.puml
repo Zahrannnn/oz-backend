@@ -1,0 +1,159 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  RoundCorner 8
+}
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam usecase {
+  BorderColor #27AE60
+  BackgroundColor #D5F5E3
+  FontSize 12
+}
+
+left to right direction
+
+' ========== ACTORS ==========
+
+actor "Parent\n(Customer)" as Parent
+actor "Administrator\n(Store Owner)" as Admin
+actor "Bosta" as Bosta
+actor "SMTP\nServer" as SMTP
+
+' ========== CUSTOMER STOREFRONT ==========
+
+rectangle "Customer Storefront" {
+  usecase "Browse Schools" as UC_P1
+  usecase "Search Schools" as UC_P2
+  usecase "Browse Products\nby Grade" as UC_P3
+  usecase "View Product\nDetails" as UC_P4
+  usecase "Manage Cart" as UC_P5
+  usecase "Add Full Set\nto Cart" as UC_P6
+  usecase "Place Order" as UC_P7
+  usecase "Track Order" as UC_P8
+  usecase "Cancel Order" as UC_P9
+  usecase "Request\nNotify-Me" as UC_P10
+}
+
+' ========== ADMIN PORTAL ==========
+
+rectangle "Admin Portal" {
+  usecase "Login" as UC_A1
+  usecase "Manage Schools" as UC_A2
+  usecase "Manage Grade\nStages" as UC_A3
+  usecase "Manage Item\nTypes" as UC_A4
+  usecase "Manage Products" as UC_A5
+  usecase "Manage\nVariants" as UC_A6
+  usecase "Manage Product\nImages" as UC_A7
+  usecase "Update Stock" as UC_A8
+  usecase "View\nDashboard" as UC_A9
+  usecase "Process Orders" as UC_A10
+  usecase "Book Bosta\nPickup" as UC_A11
+  usecase "Mark\nPicked Up" as UC_A12
+  usecase "Log Exchange" as UC_A13
+  usecase "View Reports" as UC_A14
+  usecase "Browse\nAudit Log" as UC_A15
+  usecase "Export\nAudit Log" as UC_A16
+}
+
+' ========== INTEGRATIONS ==========
+
+rectangle "Integrations" {
+  usecase "Create\nShipment" as UC_B1
+  usecase "Send Tracking\nWebhook" as UC_B2
+  usecase "Send Email" as UC_S1
+}
+
+' ========== ASSOCIATIONS ==========
+
+' Parent → Customer Storefront
+Parent --> UC_P1
+Parent --> UC_P2
+Parent --> UC_P3
+Parent --> UC_P4
+Parent --> UC_P5
+Parent --> UC_P6
+Parent --> UC_P7
+Parent --> UC_P8
+Parent --> UC_P9
+Parent --> UC_P10
+
+' Admin → Admin Portal
+Admin --> UC_A1
+Admin --> UC_A2
+Admin --> UC_A3
+Admin --> UC_A4
+Admin --> UC_A5
+Admin --> UC_A6
+Admin --> UC_A7
+Admin --> UC_A8
+Admin --> UC_A9
+Admin --> UC_A10
+Admin --> UC_A11
+Admin --> UC_A12
+Admin --> UC_A13
+Admin --> UC_A14
+Admin --> UC_A15
+Admin --> UC_A16
+
+' External systems
+Bosta --> UC_B1
+Bosta --> UC_B2
+SMTP --> UC_S1
+
+' Internal actor-system associations (system initiates)
+UC_A11 --> UC_B1 : <<invokes>>
+UC_P7 ..> UC_B1 : <<calls via Bosta API>>
+UC_P7 ..> UC_S1 : <<queues email>>
+UC_A10 ..> UC_S1 : <<queues email>>
+
+' ========== NOTES ==========
+
+note right of UC_P7
+  Atomic transaction:
+  lock variant rows,
+  check stock,
+  deduct inventory,
+  insert order + items,
+  enqueue email.
+end note
+
+note right of UC_A8
+  Diff-based triggers:
+  old=0 → new>0 fires
+  notify-me emails.
+  new < threshold flags
+  low-stock widget.
+end note
+
+note right of UC_A13
+  Multi-step transaction:
+  refund old variant stock,
+  take new variant stock,
+  compute price delta,
+  update order total.
+end note
+
+note bottom of UC_P9
+  Allowed only before
+  handed_to_courier
+  (delivery) or picked_up
+  (pickup).
+end note
+
+note bottom of UC_A11
+  Per-order only.
+  No batch pickup
+  in v1.
+end note
+
+@enduml

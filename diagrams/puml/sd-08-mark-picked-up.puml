@@ -1,0 +1,92 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-08 — Admin Marks Order Picked Up (Counter Flow)"
+
+actor "Parent" as Parent
+actor "Administrator" as Admin
+participant "Next.js Frontend\n(Vercel)" as FE
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+
+Parent -> Admin: Arrives at store\n\"I'm here to pick up\nmy order\" + phone
+activate Admin
+
+Admin -> FE: Opens /admin/orders/pickup
+activate FE
+FE -> API: GET /v1/orders/pickup-list
+activate API
+API -> DB: SELECT id, state, token_hash,\nparent_name, parent_phone,\ntotal\nFROM orders\nWHERE state = 'ready_for_pickup'\nORDER BY id DESC
+activate DB
+DB --> API: [ { id, parent_name, phone, total }, ... ]
+deactivate DB
+API --> FE: 200 [ orders ]
+deactivate API
+
+FE --> Admin: Orders list (ready_for_pickup)
+deactivate FE
+
+== Admin Searches by Phone or Order ==
+
+Admin -> API: GET /v1/orders?search=01234567890
+activate API
+API -> DB: SELECT id, state, parent_name,\nparent_phone, items, total\nFROM orders\nWHERE parent_phone LIKE '%01234567890%'\nOR CAST(id AS VARCHAR) = '01234567890'
+activate DB
+DB --> API: [ order ]
+deactivate DB
+API --> Admin: 200 { orders: [ { id, parent_name, items, total } ] }
+deactivate API
+
+Admin -> Admin: Verify parent identity\n(phone number match)
+
+Admin -> API: POST /v1/orders/{id}/mark-picked-up
+activate API
+
+API -> DB: SELECT id, state, total,\ncod_amount\nFROM orders\nWHERE id = orderId\nAND state = 'ready_for_pickup'
+activate DB
+DB --> API: { id, state: 'ready_for_pickup', total, cod: 0 }
+deactivate DB
+
+alt state != 'ready_for_pickup'
+  API --> Admin: 409 Conflict\n{ error: 'Order not ready for pickup.\nCurrent state: ' + state }
+else
+  API -> DB: BEGIN TRANSACTION
+  activate DB
+
+  API -> DB: UPDATE orders\nSET state = 'picked_up',\npicked_up_at = NOW()
+
+  API -> DB: UPDATE orders\nSET state = 'closed_success'
+
+  API -> DB: INSERT audit_log\n(action='order.picked_up',\npickup_method='counter',\nactor='admin')
+  API -> DB: COMMIT
+  deactivate DB
+
+  API --> Admin: 200 OK\n{ orderId, newState: 'closed_success' }
+end
+
+deactivate API
+
+Admin -> Parent: Hand over uniform\nitems to parent
+deactivate Admin
+
+@enduml

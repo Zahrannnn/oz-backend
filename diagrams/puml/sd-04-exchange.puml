@@ -1,0 +1,80 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-04 — Admin Logs In-Store Exchange"
+
+actor "Administrator" as Admin
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+
+Admin -> API: POST /orders/{id}/exchanges\n{ orderItemId, newVariantId, qty, reason }
+activate API
+
+API -> DB: SELECT oi.variant_id AS old_var_id,\noi.unit_price_snapshot AS old_price,\nv2.price_incl_vat AS new_price,\nv2.stock AS new_stock\nFROM order_items oi\nJOIN orders o ON o.id = oi.order_id\nJOIN variant v2 ON v2.id = newVariantId\nWHERE oi.id = orderItemId\nAND o.id = orderId
+activate DB
+DB --> API: { old_var_id, old_price, new_price, new_stock }
+deactivate DB
+
+alt new_stock < qty
+  API --> Admin: 409 Conflict\n{ error: 'New variant has insufficient\nstock. Available: ' + new_stock }
+else
+  API -> DB: BEGIN TRANSACTION
+  activate DB
+
+  note right: Step 1 — Refund old variant\nstock
+
+  API -> DB: UPDATE variant\nSET stock = stock + qty\nWHERE id = old_var_id
+
+  note right: Step 2 — Deduct from new\nvariant stock
+
+  API -> DB: UPDATE variant\nSET stock = stock - qty\nWHERE id = newVariantId
+
+  note right: Step 3 — Compute and apply\nprice delta
+
+  API -> API: price_delta =\n(new_price - old_price) * qty
+
+  API -> DB: UPDATE orders\nSET total = total + price_delta\nWHERE id = orderId
+
+  note right: Step 4 — Record exchange
+
+  API -> DB: INSERT INTO exchange\n(order_item_id, old_variant_id,\nnew_variant_id, qty, price_delta,\nreason)
+
+  API -> DB: INSERT audit_log\n(action='order.exchange',\norder_id=orderId, price_delta)
+
+  API -> DB: COMMIT
+  deactivate DB
+
+  alt price_delta > 0
+    Admin -> Admin: Collect price_delta\ncash from parent
+    API --> Admin: 200 OK\n{ exchangeId, priceDelta: +1500,\ncashSettlement: 'parent_pays_1500' }
+  else price_delta < 0
+    Admin -> Admin: Refund price_delta\ncash to parent
+    API --> Admin: 200 OK\n{ exchangeId, priceDelta: -1500,\ncashSettlement: 'refund_parent_1500' }
+  else
+    API --> Admin: 200 OK\n{ exchangeId, priceDelta: 0,\ncashSettlement: 'even' }
+  end
+end
+
+deactivate API
+
+@enduml

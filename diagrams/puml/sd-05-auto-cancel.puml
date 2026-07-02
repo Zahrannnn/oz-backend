@@ -1,0 +1,65 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+skinparam actor {
+  BorderColor #E67E22
+  BackgroundColor #F0B27A
+  FontColor #E67E22
+  FontSize 12
+}
+
+title "sd-05 — 5-Day Auto-Cancel (Hangfire Scheduled Job)"
+
+participant "Hangfire\nScheduler" as HF
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+actor "System" as SYS
+actor "SMTP\n(Gmail)" as SMTP
+
+== Daily at 03:00 ==
+
+HF -> API: Trigger AutoCancelOrphansJob
+activate API
+
+API -> DB: SELECT o.id, oi.variant_id, oi.qty,\nou.parent_email\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.id\nWHERE o.state IN\n('placed', 'ready_to_ship',\n 'ready_for_pickup')\nAND o.state_changed_at < DATEADD(DAY, -5, NOW())
+activate DB
+DB --> API: [ { orderId, items, parentEmail } ]  10 rows
+deactivate DB
+
+loop for each stalled order
+  API -> DB: BEGIN TRANSACTION
+  activate DB
+
+  API -> DB: UPDATE orders\nSET state = 'cancelled',\ncancelled_at = NOW()\nWHERE id = orderId
+
+  loop for each item
+    API -> DB: UPDATE variant\nSET stock = stock + qty\nWHERE id = variant_id
+    note right: Stock restored for\neach item
+  end
+
+  API -> DB: INSERT audit_log\n(action='order.auto_cancelled',\nactor='system', order_id=orderId)
+
+  API -> DB: COMMIT
+  deactivate DB
+
+  API -> SMTP: Send auto-cancel\nnotification email
+end
+
+note right: Idempotent — subsequent runs\nskip already-cancelled orders.
+
+API --> HF: { cancelledCount: 10 }
+deactivate API
+
+@enduml

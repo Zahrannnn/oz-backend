@@ -1,0 +1,70 @@
+@startuml
+skinparam backgroundColor #FEFEFE
+skinparam defaultTextAlignment center
+skinparam actor {
+  BorderColor #2980B9
+  BackgroundColor #3498DB
+  FontColor #FFFFFF
+  FontSize 14
+  FontStyle bold
+}
+skinparam participant {
+  BorderColor #2C3E50
+  BackgroundColor #ECF0F1
+  FontColor #2C3E50
+  FontSize 12
+}
+skinparam database {
+  BorderColor #8E44AD
+  BackgroundColor #E8DAEF
+  FontColor #8E44AD
+  FontSize 12
+}
+
+title "sd-11 — View Order by Token URL"
+
+actor "Parent" as Parent
+participant "Next.js Frontend\n(Vercel)" as FE
+participant ".NET API\n(MonsterASP)" as API
+database "MS SQL\nServer" as DB
+
+Parent -> Parent: Opens token URL from\norder confirmation email\n(e.g., /orders/token/abc123xyz)
+activate Parent
+
+Parent -> FE: GET /orders/token/abc123xyz
+activate FE
+
+FE -> API: GET /v1/orders/by-token/abc123xyz
+activate API
+
+API -> API: token_hash =\nHASHBYTES('SHA2_256', 'abc123xyz')
+
+API -> DB: SELECT o.id, o.state, o.total,\no.created_at, o.state_changed_at,\no.delivered_at, o.parent_name,\noi.product_name, oi.variant_name,\noi.qty, oi.unit_price_snapshot,\noi.line_total_snapshot\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.id\nWHERE o.token_hash = token_hash
+activate DB
+note right: Hash comparison prevents\nDB index on raw token.\nNo timing side-channel on\nURL parameter.
+DB --> API: { order, items: [...] }
+deactivate DB
+
+alt order not found
+  API --> FE: 404 Not Found\n{ error: 'Order not found.\nInvalid or expired token.' }
+else
+  API -> API: Build status timeline\n(ordered → shipped → delivered / cancelled)
+
+  alt state IN ('cancelled', 'closed_success', 'closed_failed')
+    API -> API: Hide cancel button
+  else
+    API -> API: Show cancel button\n(if pre-handoff)
+  end
+
+  API --> FE: 200 { order, items, timeline, canCancel }
+end
+
+deactivate API
+
+FE -> FE: Render order status page:\n- items summary\n- status timeline (ordered → ... → current)\n- cancel link (if canCancel)
+FE --> Parent: Order status page\nwith timeline
+deactivate FE
+
+deactivate Parent
+
+@enduml
