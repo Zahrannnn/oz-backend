@@ -11,10 +11,26 @@ public class SecurityHeadersMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        var path = context.Request.Path.Value ?? string.Empty;
+
         context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
         context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
         context.Response.Headers.TryAdd("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-        context.Response.Headers.TryAdd("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+
+        if (path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.Headers.TryAdd("Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self'");
+        }
+        else if (path.StartsWith("/hangfire", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.Headers.TryAdd("Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
+        }
+        else
+        {
+            context.Response.Headers.TryAdd("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+        }
 
         await _next(context);
     }
