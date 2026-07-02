@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -76,6 +78,92 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.Email == request.Email);
+
+        if (admin != null)
+        {
+            var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            var codeHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code))).ToLowerInvariant();
+
+            _db.PasswordRecoveries.Add(new PasswordRecovery
+            {
+                Id = Guid.NewGuid(),
+                AdminId = admin.Id,
+                CodeHash = codeHash,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+                Used = false,
+                Attempts = 0,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync();
+            await _auditLog.WriteAsync(admin.Id, "admin.forgot_password", "admin", admin.Id.ToString());
+
+            return Ok(new
+            {
+                message = "If the email exists, a recovery code has been generated.",
+                code
+            });
+        }
+
+        return Ok(new { message = "If the email exists, a recovery code has been generated." });
+    }
+
+    [HttpPost("verify-recovery-code")]
+    public async Task<IActionResult> VerifyRecoveryCode([FromBody] VerifyRecoveryCodeRequest request)
+    {
+        var admin = await _db.Admins.FirstOrDefaultAsync(a => a.Email == request.Email);
+        if (admin == null)
+            return Unauthorized(new { error = "invalid_code" });
+
+        var recovery = await _db.PasswordRecoveries
+            .Where(r => r.AdminId == admin.Id && !r.Used && r.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(r => r.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (recovery == null)
+            return StatusCode(410, new { error = "code_expired" });
+
+        var codeHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.Code))).ToLowerInvariant();
+
+        if (recovery.CodeHash != codeHash)
+        {
+            recovery.Attempts++;
+            if (recovery.Attempts >= 5)
+                recovery.Used = true;
+
+            await _db.SaveChangesAsync();
+            return Unauthorized(new { error = "invalid_code" });
+        }
+
+        recovery.Used = true;
+        await _db.SaveChangesAsync();
+
+        var token = _jwt.GenerateToken(admin);
+
+        Response.Cookies.Append("admin_session", token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            MaxAge = TimeSpan.FromHours(8)
+        });
+
+        await _auditLog.WriteAsync(admin.Id, "admin.recovery_success", "admin", admin.Id.ToString());
+
+        return Ok(new
+        {
+            adminId = admin.Id.ToString(),
+            email = admin.Email,
+            token,
+            expiresAt = DateTime.UtcNow.AddHours(8)
+        });
+    }
+
     [HttpPost("logout")]
     public IActionResult Logout()
     {
@@ -112,4 +200,15 @@ public class LoginRequest
 {
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+}
+
+public class ForgotPasswordRequest
+{
+    public string Email { get; set; } = string.Empty;
+}
+
+public class VerifyRecoveryCodeRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
 }
