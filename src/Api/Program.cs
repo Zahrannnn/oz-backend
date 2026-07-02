@@ -1,5 +1,10 @@
+using System.Reflection;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
@@ -8,7 +13,7 @@ using Oz.Infrastructure.Repositories;
 using Oz.Domain.Repositories;
 using Oz.Api.Filters;
 using Oz.Api.Middleware;
-using System.Reflection;
+using Oz.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,8 +80,48 @@ builder.Services.AddHangfire(config =>
 
 builder.Services.AddHangfireServer();
 
-// Repositories
-builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+// JWT auth config
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET")
+    ?? throw new InvalidOperationException("JWT secret not configured");
+var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = jwtKey,
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "oz-api",
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "oz-admin",
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+                if (authHeader?.StartsWith("Bearer ") == true)
+                    context.Token = authHeader["Bearer ".Length..];
+                else
+                    context.Token = context.Request.Cookies["admin_session"];
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// Application services
+builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<AuditLogService>();
+
+// Seed initial admin on first run
+builder.Services.AddHostedService<AdminInitializer>();
 
 var app = builder.Build();
 
@@ -84,6 +129,15 @@ var app = builder.Build();
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseSecurityHeaders();
 app.UseCors();
+
+// Static files - serve product images from /uploads (content-root relative)
+var uploadsRoot = Path.Combine(app.Environment.ContentRootPath, "uploads");
+Directory.CreateDirectory(uploadsRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsRoot),
+    RequestPath = "/uploads"
+});
 
 // OpenAPI spec endpoint
 if (app.Environment.IsDevelopment())
@@ -119,6 +173,7 @@ app.MapGet("/swagger", () => Results.Content("""
 """, "text/html; charset=utf-8")).ExcludeFromDescription();
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Hangfire dashboard (localhost only in dev)

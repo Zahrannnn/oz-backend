@@ -1,0 +1,39 @@
+using Microsoft.EntityFrameworkCore;
+using Oz.Domain.Entities;
+using Oz.Infrastructure.Data;
+
+namespace Oz.Api.Services;
+
+public class AdminInitializer : IHostedService
+{
+    private readonly IServiceProvider _services;
+
+    public AdminInitializer(IServiceProvider services)
+    {
+        _services = services;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (!await db.Admins.AnyAsync(cancellationToken))
+        {
+            var salt = BCrypt.Net.BCrypt.GenerateSalt(12);
+            var hash = BCrypt.Net.BCrypt.HashPassword("admin123", salt);
+
+            db.Admins.Add(new Admin
+            {
+                Id = Guid.NewGuid(),
+                Email = "admin@oz.com",
+                PasswordHash = hash,
+                PasswordSalt = salt
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            Console.WriteLine("[AdminInitializer] Default admin created: admin@oz.com / admin123");
+        }
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}
