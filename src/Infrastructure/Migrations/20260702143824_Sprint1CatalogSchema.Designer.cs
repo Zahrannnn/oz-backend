@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Oz.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Oz.Infrastructure.Data;
 namespace Oz.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702143824_Sprint1CatalogSchema")]
+    partial class Sprint1CatalogSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,121 +24,6 @@ namespace Oz.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("Oz.Domain.Entities.Admin", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("email");
-
-                    b.Property<int>("FailedAttempts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0)
-                        .HasColumnName("failed_attempts");
-
-                    b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("last_login_at");
-
-                    b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("locked_until");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("password_hash");
-
-                    b.Property<string>("PasswordSalt")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("password_salt");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.ToTable("admin", (string)null);
-                });
-
-            modelBuilder.Entity("Oz.Domain.Entities.AuditLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("action");
-
-                    b.Property<Guid>("ActorId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("actor_id");
-
-                    b.Property<string>("AfterJson")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("after_json");
-
-                    b.Property<string>("BeforeJson")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("before_json");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("reason");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt")
-                        .IsDescending();
-
-                    b.HasIndex("ActorId", "CreatedAt")
-                        .IsDescending(false, true);
-
-                    b.ToTable("audit_log", (string)null);
-                });
 
             modelBuilder.Entity("Oz.Domain.Entities.GradeStage", b =>
                 {
@@ -341,103 +229,6 @@ namespace Oz.Infrastructure.Migrations
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Name = "Socks"
                         });
-                });
-
-            modelBuilder.Entity("Oz.Domain.Entities.PasswordRecovery", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<Guid>("AdminId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("admin_id");
-
-                    b.Property<int>("Attempts")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0)
-                        .HasColumnName("attempts");
-
-                    b.Property<string>("CodeHash")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("code_hash");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("expires_at");
-
-                    b.Property<bool>("Used")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false)
-                        .HasColumnName("used");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AdminId");
-
-                    b.ToTable("password_recovery", (string)null);
-                });
-
-            modelBuilder.Entity("Oz.Domain.Entities.PendingAlert", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("email");
-
-                    b.Property<string>("EmailHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)")
-                        .HasColumnName("email_hash");
-
-                    b.Property<bool>("Notified")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false)
-                        .HasColumnName("notified");
-
-                    b.Property<DateTime?>("NotifiedAt")
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("notified_at");
-
-                    b.Property<long>("VariantId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("variant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("VariantId", "EmailHash")
-                        .IsUnique()
-                        .HasFilter("[notified] = 0");
-
-                    b.ToTable("pending_alert", (string)null);
                 });
 
             modelBuilder.Entity("Oz.Domain.Entities.Product", b =>
@@ -720,28 +511,6 @@ namespace Oz.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("School");
-                });
-
-            modelBuilder.Entity("Oz.Domain.Entities.PasswordRecovery", b =>
-                {
-                    b.HasOne("Oz.Domain.Entities.Admin", "Admin")
-                        .WithMany()
-                        .HasForeignKey("AdminId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Admin");
-                });
-
-            modelBuilder.Entity("Oz.Domain.Entities.PendingAlert", b =>
-                {
-                    b.HasOne("Oz.Domain.Entities.Variant", "Variant")
-                        .WithMany()
-                        .HasForeignKey("VariantId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Variant");
                 });
 
             modelBuilder.Entity("Oz.Domain.Entities.Product", b =>

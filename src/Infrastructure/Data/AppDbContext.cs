@@ -11,6 +11,13 @@ public class AppDbContext : DbContext
     public DbSet<School> Schools => Set<School>();
     public DbSet<GradeStage> GradeStages => Set<GradeStage>();
     public DbSet<ItemType> ItemTypes => Set<ItemType>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Variant> Variants => Set<Variant>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+public DbSet<Admin> Admins => Set<Admin>();
+    public DbSet<PasswordRecovery> PasswordRecoveries => Set<PasswordRecovery>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<PendingAlert> PendingAlerts => Set<PendingAlert>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,25 +25,29 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<School>(e =>
         {
+            e.ToTable("school", t => t.HasCheckConstraint("CK_school_type", "[type] BETWEEN 1 AND 6"));
             e.HasKey(x => x.Id);
-            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
-            e.Property(x => x.NameAr).HasMaxLength(200).IsRequired();
-            e.Property(x => x.Slug).HasMaxLength(200).IsRequired();
-            e.Property(x => x.IsActive).HasDefaultValue(true);
-            e.Property(x => x.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
-            e.Property(x => x.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
-            e.HasIndex(x => x.Slug).IsUnique();
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired().HasColumnType("nvarchar(200)");
+            e.Property(x => x.Type).HasColumnName("type").HasColumnType("tinyint").IsRequired();
+            e.Property(x => x.IsArchived).HasColumnName("is_archived").HasDefaultValue(false);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasIndex(x => x.Name).IsUnique().HasFilter("[is_archived] = 0");
+            e.HasIndex(x => x.Type);
         });
 
         modelBuilder.Entity<GradeStage>(e =>
         {
+            e.ToTable("grade_stage");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
-            e.Property(x => x.NameAr).HasMaxLength(100).IsRequired();
-            e.Property(x => x.SortOrder).HasDefaultValue(0);
-            e.Property(x => x.IsActive).HasDefaultValue(true);
-            e.Property(x => x.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
-            e.Property(x => x.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.SchoolId).HasColumnName("school_id").HasColumnType("bigint");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired().HasColumnType("nvarchar(100)");
+            e.Property(x => x.DisplayOrder).HasColumnName("display_order").HasDefaultValue(0);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
             e.HasOne(x => x.School).WithMany(s => s.GradeStages).HasForeignKey(x => x.SchoolId).OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => new { x.SchoolId, x.Name }).IsUnique();
             e.HasIndex(x => x.SchoolId);
@@ -44,46 +55,176 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<ItemType>(e =>
         {
+            e.ToTable("item_type");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
-            e.Property(x => x.NameAr).HasMaxLength(100).IsRequired();
-            e.Property(x => x.Slug).HasMaxLength(100).IsRequired();
-            e.Property(x => x.IsActive).HasDefaultValue(true);
-            e.Property(x => x.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
-            e.Property(x => x.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired().HasColumnType("nvarchar(100)");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
             e.HasIndex(x => x.Name).IsUnique();
-            e.HasIndex(x => x.Slug).IsUnique();
         });
 
+        modelBuilder.Entity<Product>(e =>
+        {
+            e.ToTable("product", t => t.HasCheckConstraint("CK_product_gender", "[gender] IN (1, 2, 3)"));
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.SchoolId).HasColumnName("school_id").HasColumnType("bigint");
+            e.Property(x => x.GradeStageId).HasColumnName("grade_stage_id").HasColumnType("bigint");
+            e.Property(x => x.ItemTypeId).HasColumnName("item_type_id").HasColumnType("bigint");
+            e.Property(x => x.Gender).HasColumnName("gender").HasColumnType("tinyint").IsRequired();
+            e.Property(x => x.Color).HasColumnName("color").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            e.Property(x => x.IsInSet).HasColumnName("is_in_set").HasDefaultValue(false);
+            e.Property(x => x.IsArchived).HasColumnName("is_archived").HasDefaultValue(false);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.School).WithMany(s => s.Products).HasForeignKey(x => x.SchoolId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.GradeStage).WithMany(g => g.Products).HasForeignKey(x => x.GradeStageId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.ItemType).WithMany(i => i.Products).HasForeignKey(x => x.ItemTypeId).OnDelete(DeleteBehavior.NoAction);
+
+            e.HasIndex(x => new { x.SchoolId, x.GradeStageId, x.ItemTypeId, x.Gender }).IsUnique().HasFilter("[is_archived] = 0");
+            e.HasIndex(x => new { x.SchoolId, x.GradeStageId });
+            e.HasIndex(x => x.ItemTypeId);
+            e.HasIndex(x => new { x.SchoolId, x.GradeStageId, x.Gender }).HasFilter("[is_in_set] = 1");
+        });
+
+        modelBuilder.Entity<Variant>(e =>
+        {
+            e.ToTable("variant", t =>
+            {
+                t.HasCheckConstraint("CK_variant_stock_nonneg", "[stock] >= 0");
+                t.HasCheckConstraint("CK_variant_threshold_nonneg", "[low_stock_threshold] >= 0");
+            });
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.ProductId).HasColumnName("product_id").HasColumnType("bigint");
+            e.Property(x => x.SizeLabel).HasColumnName("size_label").HasMaxLength(50).IsRequired().HasColumnType("nvarchar(50)");
+            e.Property(x => x.PriceInclVat).HasColumnName("price_incl_vat").HasColumnType("decimal(10,2)").IsRequired();
+            e.Property(x => x.Stock).HasColumnName("stock").HasDefaultValue(0);
+            e.Property(x => x.Reserved).HasColumnName("reserved").HasDefaultValue(0);
+            e.Property(x => x.LowStockThreshold).HasColumnName("low_stock_threshold").HasDefaultValue(5);
+            e.Property(x => x.IsArchived).HasColumnName("is_archived").HasDefaultValue(false);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.Product).WithMany(p => p.Variants).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
+
+            e.HasIndex(x => new { x.ProductId, x.SizeLabel }).IsUnique().HasFilter("[is_archived] = 0");
+            e.HasIndex(x => x.ProductId);
+            e.HasIndex(x => new { x.Stock, x.LowStockThreshold }).HasFilter("[is_archived] = 0");
+        });
+
+        modelBuilder.Entity<ProductImage>(e =>
+        {
+            e.ToTable("product_image");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.ProductId).HasColumnName("product_id").HasColumnType("bigint");
+            e.Property(x => x.Url).HasColumnName("url").HasMaxLength(500).IsRequired().HasColumnType("nvarchar(500)");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order").HasDefaultValue(0);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.Product).WithMany(p => p.Images).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.NoAction);
+            e.HasIndex(x => new { x.ProductId, x.SortOrder });
+        });
+
+        modelBuilder.Entity<Admin>(e =>
+        {
+            e.ToTable("admin");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("NEWSEQUENTIALID()");
+            e.Property(x => x.Email).HasColumnName("email").HasMaxLength(255).IsRequired().HasColumnType("nvarchar(255)");
+            e.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(500).IsRequired().HasColumnType("nvarchar(500)");
+            e.Property(x => x.PasswordSalt).HasColumnName("password_salt").HasMaxLength(500).IsRequired().HasColumnType("nvarchar(500)");
+            e.Property(x => x.FailedAttempts).HasColumnName("failed_attempts").HasDefaultValue(0);
+            e.Property(x => x.LockedUntil).HasColumnName("locked_until").HasColumnType("datetime2(3)");
+            e.Property(x => x.LastLoginAt).HasColumnName("last_login_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasIndex(x => x.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<PasswordRecovery>(e =>
+        {
+            e.ToTable("password_recovery");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("NEWSEQUENTIALID()");
+            e.Property(x => x.AdminId).HasColumnName("admin_id");
+            e.Property(x => x.CodeHash).HasColumnName("code_hash").HasMaxLength(500).IsRequired().HasColumnType("nvarchar(500)");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at").HasColumnType("datetime2(3)").IsRequired();
+            e.Property(x => x.Used).HasColumnName("used").HasDefaultValue(false);
+            e.Property(x => x.Attempts).HasColumnName("attempts").HasDefaultValue(0);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.Admin).WithMany().HasForeignKey(x => x.AdminId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.ToTable("audit_log");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint").ValueGeneratedOnAdd();
+            e.Property(x => x.ActorId).HasColumnName("actor_id");
+            e.Property(x => x.Action).HasColumnName("action").HasMaxLength(100).IsRequired().HasColumnType("nvarchar(100)");
+            e.Property(x => x.EntityType).HasColumnName("entity_type").HasMaxLength(100).IsRequired().HasColumnType("nvarchar(100)");
+            e.Property(x => x.EntityId).HasColumnName("entity_id").HasMaxLength(50).IsRequired().HasColumnType("nvarchar(50)");
+            e.Property(x => x.BeforeJson).HasColumnName("before_json").HasColumnType("nvarchar(max)");
+            e.Property(x => x.AfterJson).HasColumnName("after_json").HasColumnType("nvarchar(max)");
+            e.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasIndex(x => x.CreatedAt).IsDescending();
+            e.HasIndex(x => new { x.ActorId, x.CreatedAt }).IsDescending(false, true);
+        });
+
+        modelBuilder.Entity<PendingAlert>(e =>
+        {
+            e.ToTable("pending_alert");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint").ValueGeneratedOnAdd();
+            e.Property(x => x.VariantId).HasColumnName("variant_id").HasColumnType("bigint");
+            e.Property(x => x.Email).HasColumnName("email").HasMaxLength(255).IsRequired().HasColumnType("nvarchar(255)");
+            e.Property(x => x.EmailHash).HasColumnName("email_hash").HasMaxLength(64).IsRequired().HasColumnType("nvarchar(64)");
+            e.Property(x => x.Notified).HasColumnName("notified").HasDefaultValue(false);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.NotifiedAt).HasColumnName("notified_at").HasColumnType("datetime2(3)");
+
+            e.HasOne(x => x.Variant).WithMany().HasForeignKey(x => x.VariantId).OnDelete(DeleteBehavior.NoAction);
+            e.HasIndex(x => new { x.VariantId, x.EmailHash }).IsUnique().HasFilter("[notified] = 0");
+        });
+
+        var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         modelBuilder.Entity<School>().HasData(
-            new School { Id = 1, Name = "Cairo Language School", NameAr = "مدرسة القاهرة للغات", Slug = "cairo-language-school", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new School { Id = 2, Name = "Alexandria Experimental", NameAr = "مدرسة الإسكندرية التجريبية", Slug = "alexandria-experimental", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new School { Id = 3, Name = "Giza Arabic School", NameAr = "مدرسة الجيزة العربية", Slug = "giza-arabic-school", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
+            new School { Id = 1, Name = "Cairo Language School", Type = SchoolType.Experimental, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate },
+            new School { Id = 2, Name = "Alexandria Experimental", Type = SchoolType.Experimental, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate },
+            new School { Id = 3, Name = "Giza Arabic School", Type = SchoolType.Arabic, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate }
         );
 
         modelBuilder.Entity<GradeStage>().HasData(
-            new GradeStage { Id = 1, SchoolId = 1, Name = "KG1", NameAr = "كي جي 1", SortOrder = 1, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 2, SchoolId = 1, Name = "KG2", NameAr = "كي جي 2", SortOrder = 2, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 3, SchoolId = 1, Name = "KG3", NameAr = "كي جي 3", SortOrder = 3, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 4, SchoolId = 1, Name = "FS1", NameAr = "صف اول", SortOrder = 4, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 5, SchoolId = 1, Name = "FS2", NameAr = "صف ثاني", SortOrder = 5, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 6, SchoolId = 1, Name = "FS3", NameAr = "صف ثالث", SortOrder = 6, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 7, SchoolId = 1, Name = "FS4", NameAr = "صف رابع", SortOrder = 7, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 8, SchoolId = 1, Name = "FS5", NameAr = "صف خامس", SortOrder = 8, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new GradeStage { Id = 9, SchoolId = 1, Name = "FS6", NameAr = "صف سادس", SortOrder = 9, IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
+            new GradeStage { Id = 1, SchoolId = 1, Name = "KG1", DisplayOrder = 1, CreatedAt = seedDate },
+            new GradeStage { Id = 2, SchoolId = 1, Name = "KG2", DisplayOrder = 2, CreatedAt = seedDate },
+            new GradeStage { Id = 3, SchoolId = 1, Name = "KG3", DisplayOrder = 3, CreatedAt = seedDate },
+            new GradeStage { Id = 4, SchoolId = 1, Name = "FS1", DisplayOrder = 4, CreatedAt = seedDate },
+            new GradeStage { Id = 5, SchoolId = 1, Name = "FS2", DisplayOrder = 5, CreatedAt = seedDate },
+            new GradeStage { Id = 6, SchoolId = 1, Name = "FS3", DisplayOrder = 6, CreatedAt = seedDate },
+            new GradeStage { Id = 7, SchoolId = 1, Name = "FS4", DisplayOrder = 7, CreatedAt = seedDate },
+            new GradeStage { Id = 8, SchoolId = 1, Name = "FS5", DisplayOrder = 8, CreatedAt = seedDate },
+            new GradeStage { Id = 9, SchoolId = 1, Name = "FS6", DisplayOrder = 9, CreatedAt = seedDate }
         );
 
         modelBuilder.Entity<ItemType>().HasData(
-            new ItemType { Id = 1, Name = "T-Shirt", NameAr = "تي شيرت", Slug = "t-shirt", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 2, Name = "Polo", NameAr = "بولو", Slug = "polo", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 3, Name = "Shirt", NameAr = "قميص", Slug = "shirt", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 4, Name = "Trousers", NameAr = "بنطلون", Slug = "trousers", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 5, Name = "Shorts", NameAr = "شورت", Slug = "shorts", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 6, Name = "Skirt", NameAr = "تنورة", Slug = "skirt", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 7, Name = "Pinafore", NameAr = "مريلة", Slug = "pinafore", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 8, Name = "Sweater", NameAr = "سترة", Slug = "sweater", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 9, Name = "Tracksuit", NameAr = "بدلة رياضية", Slug = "tracksuit", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new ItemType { Id = 10, Name = "Socks", NameAr = "جوارب", Slug = "socks", IsActive = true, CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
+            new ItemType { Id = 1, Name = "T-Shirt", CreatedAt = seedDate },
+            new ItemType { Id = 2, Name = "Polo", CreatedAt = seedDate },
+            new ItemType { Id = 3, Name = "Shirt", CreatedAt = seedDate },
+            new ItemType { Id = 4, Name = "Trousers", CreatedAt = seedDate },
+            new ItemType { Id = 5, Name = "Shorts", CreatedAt = seedDate },
+            new ItemType { Id = 6, Name = "Skirt", CreatedAt = seedDate },
+            new ItemType { Id = 7, Name = "Pinafore", CreatedAt = seedDate },
+            new ItemType { Id = 8, Name = "Sweater", CreatedAt = seedDate },
+            new ItemType { Id = 9, Name = "Tracksuit", CreatedAt = seedDate },
+            new ItemType { Id = 10, Name = "Socks", CreatedAt = seedDate }
         );
     }
 }

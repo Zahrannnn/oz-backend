@@ -29,7 +29,7 @@ public class SecurityHeadersMiddleware
         }
         else
         {
-            context.Response.Headers.TryAdd("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+            context.Response.Headers.TryAdd("Content-Security-Policy", "default-src 'none'; img-src 'self'; frame-ancestors 'none'");
         }
 
         await _next(context);
