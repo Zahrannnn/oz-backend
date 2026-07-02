@@ -165,6 +165,40 @@ public class AdminOrdersController : ControllerBase
         return Ok(ToDetail(order, auditLogs));
     }
 
+    [HttpPost("{id:long}/mark-picked-up")]
+    public async Task<IActionResult> MarkPickedUp(long id)
+    {
+        var order = await _db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Variant)
+                    .ThenInclude(v => v.Product)
+                        .ThenInclude(p => p.ItemType)
+            .FirstOrDefaultAsync(o => o.Id == id);
+
+        if (order == null) return NotFound();
+
+        if (order.State != OrderState.ReadyForPickup || order.Channel != OrderChannel.Pickup)
+            return Conflict(new { error = "Invalid state or channel" });
+
+        var before = JsonSerializer.Serialize(order);
+        var now = DateTime.UtcNow;
+
+        order.State = OrderState.PickedUp;
+        order.PickedUpAt = now;
+        order.StateChangedAt = now;
+
+        await _db.SaveChangesAsync();
+
+        order.State = OrderState.ClosedSuccess;
+
+        await _db.SaveChangesAsync();
+
+        var after = JsonSerializer.Serialize(order);
+        await _auditLog.WriteAsync(GetActorId(), "order.picked_up", "order", id.ToString(), before, after);
+
+        return Ok(ToDetail(order, null));
+    }
+
     [HttpPost("{id:long}/transition")]
     public async Task<IActionResult> Transition(long id, [FromBody] OrderTransitionRequest request)
     {
