@@ -133,6 +133,22 @@ Response 200: `{ message: "logged_out" }`
 ### GET /api/v1/admin/auth/me
 Requires auth. Response 200: `{ adminId, email, expiresAt }` | 401
 
+### POST /api/v1/admin/auth/forgot-password
+Body: `{ "email": "admin@oz.com" }`
+Always returns 200 (no enumeration). If email exists, response includes recovery code:
+```json
+{ "message": "If the email exists, a recovery code has been generated.", "code": "258120" }
+```
+If email not found: `{ "message": "If the email exists, a recovery code has been generated." }` (no code field)
+
+### POST /api/v1/admin/auth/verify-recovery-code
+Body: `{ "email": "admin@oz.com", "code": "258120" }`
+
+Responses:
+- 200: `{ adminId, email, token, expiresAt }` + sets `admin_session` cookie (same as login)
+- 401: `{ error: "invalid_code" }` (wrong code or email not found; increments attempts, locks after 5)
+- 410: `{ error: "code_expired" }` (no valid unused recovery row found)
+
 ---
 
 ## Admin — Schools
@@ -208,6 +224,111 @@ Response 201: `{ id, productId, url, sortOrder }`
 
 ### DELETE /api/v1/admin/products/{productId}/images/{imageId}
 Response 204: NoContent
+
+---
+
+## Admin — Dashboard
+
+### GET /api/v1/admin/dashboard
+Requires auth. Response 200:
+```json
+{
+  "revenueThisMonth": 0.0,
+  "ordersToday": 2,
+  "pendingOrders": 2,
+  "lowStockCount": 0,
+  "recentActivity": [
+    { "id": 17, "action": "admin.login_success", "entityType": "admin", "entityId": "guid", "createdAt": "..." }
+  ],
+  "lowStockVariants": [
+    { "id": 1, "sizeLabel": "M", "stock": 2, "lowStockThreshold": 5, "productName": "T-Shirt" }
+  ]
+}
+```
+
+---
+
+## Admin — Grade Stages
+
+All require auth. Route prefix: `/api/v1/admin/grade-stages`
+
+### GET /api/v1/admin/grade-stages
+Query: `?schoolId=1&page=1&page_size=20`
+Response: `{ items: [{ id, schoolId, name, displayOrder, createdAt }], total, page, page_size }`
+
+### GET /api/v1/admin/grade-stages/{id}
+Response: `{ id, schoolId, name, displayOrder, createdAt }` | 404
+
+### POST /api/v1/admin/grade-stages
+Body: `{ schoolId, name, displayOrder }`
+Response 201: grade stage object
+
+### PUT /api/v1/admin/grade-stages/{id}
+Body: `{ schoolId, name, displayOrder }`
+
+### POST /api/v1/admin/grade-stages/{id}/archive
+Deletes the entity (GradeStage has no soft-delete flag).
+
+### DELETE /api/v1/admin/grade-stages/{id}
+Returns 405.
+
+---
+
+## Admin — Item Types
+
+All require auth. Route prefix: `/api/v1/admin/item-types`
+
+### GET /api/v1/admin/item-types
+Query: `?page=1&page_size=20`
+Response: `{ items: [{ id, name, createdAt }], total, page, pageSize }`
+
+### GET /api/v1/admin/item-types/{id}
+Response: `{ id, name, createdAt }` | 404
+
+### POST /api/v1/admin/item-types
+Body: `{ name }`
+Response 201: item type object
+
+### PUT /api/v1/admin/item-types/{id}
+Body: `{ name }`
+
+### POST /api/v1/admin/item-types/{id}/archive
+Deletes the entity.
+
+### DELETE /api/v1/admin/item-types/{id}
+Returns 405.
+
+---
+
+## Admin — Stock Edit
+
+### PUT /api/v1/admin/variants/{id}/stock
+Requires auth. Body: `{ stock, reason?, threshold? }`
+
+Flow: UPDLOCK transaction → save old stock → update stock + threshold → audit log → commit.
+
+Response 200: full variant object `{ id, productId, sizeLabel, priceInclVat, stock, reserved, lowStockThreshold, isArchived, createdAt, updatedAt }`
+Response 404: variant not found
+
+---
+
+## Admin — Audit Log
+
+All require auth. Route prefix: `/api/v1/admin/audit-log`
+
+### GET /api/v1/admin/audit-log
+Query: `?actor=<guid>&action=<string>&from=<datetime>&to=<datetime>&entity_type=<string>&page=1&page_size=20`
+
+All filters optional. Sorted by `createdAt DESC`.
+
+Response: `{ items: [{ id, actorId, action, entityType, entityId, beforeJson, afterJson, reason, createdAt }], total, page, page_size }`
+
+### GET /api/v1/admin/audit-log/export
+Same query params (no pagination). Returns CSV file download.
+
+Response: `Content-Type: text/csv`, `Content-Disposition: attachment; filename=audit-log-export.csv`
+
+CSV columns: `Id,ActorId,Action,EntityType,EntityId,CreatedAt,Reason`
 
 ---
 
