@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Oz.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Oz.Infrastructure.Data;
 namespace Oz.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260702151926_Sprint2OrderSchema")]
+    partial class Sprint2OrderSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -135,60 +138,6 @@ namespace Oz.Infrastructure.Migrations
                         .IsDescending(false, true);
 
                     b.ToTable("audit_log", (string)null);
-                });
-
-            modelBuilder.Entity("Oz.Domain.Entities.EmailLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2(3)")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<string>("Error")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("error");
-
-                    b.Property<long?>("OrderId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("order_id");
-
-                    b.Property<string>("Recipient")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("recipient");
-
-                    b.Property<byte>("Status")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
-                        .HasDefaultValue((byte)0)
-                        .HasColumnName("status");
-
-                    b.Property<string>("Template")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("template");
-
-                    b.Property<long?>("VariantId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("variant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrderId");
-
-                    b.HasIndex("Status", "CreatedAt");
-
-                    b.ToTable("email_log", (string)null);
                 });
 
             modelBuilder.Entity("Oz.Domain.Entities.GradeStage", b =>

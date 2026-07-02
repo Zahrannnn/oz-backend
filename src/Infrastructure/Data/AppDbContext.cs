@@ -14,10 +14,13 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Variant> Variants => Set<Variant>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
-public DbSet<Admin> Admins => Set<Admin>();
+    public DbSet<Admin> Admins => Set<Admin>();
     public DbSet<PasswordRecovery> PasswordRecoveries => Set<PasswordRecovery>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<PendingAlert> PendingAlerts => Set<PendingAlert>();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -192,6 +195,76 @@ public DbSet<Admin> Admins => Set<Admin>();
 
             e.HasOne(x => x.Variant).WithMany().HasForeignKey(x => x.VariantId).OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => new { x.VariantId, x.EmailHash }).IsUnique().HasFilter("[notified] = 0");
+        });
+
+        modelBuilder.Entity<Order>(e =>
+        {
+            e.ToTable("order", t =>
+            {
+                t.HasCheckConstraint("CK_order_state", "[state] IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)");
+                t.HasCheckConstraint("CK_order_channel", "[channel] IN (1, 2)");
+                t.HasCheckConstraint("CK_order_pickup_address", "[channel] = 2 AND [address_line] IS NULL OR [channel] = 1");
+            });
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.TrackingTokenHash).HasColumnName("tracking_token_hash").HasColumnType("binary(32)").IsRequired();
+            e.Property(x => x.State).HasColumnName("state").HasColumnType("tinyint").IsRequired();
+            e.Property(x => x.Channel).HasColumnName("channel").HasColumnType("tinyint").IsRequired();
+            e.Property(x => x.CustomerName).HasColumnName("customer_name").HasMaxLength(200).IsRequired().HasColumnType("nvarchar(200)");
+            e.Property(x => x.CustomerPhone).HasColumnName("customer_phone").HasMaxLength(20).IsRequired().HasColumnType("varchar(20)");
+            e.Property(x => x.CustomerEmail).HasColumnName("customer_email").HasMaxLength(200).IsRequired().HasColumnType("varchar(200)");
+            e.Property(x => x.AddressCity).HasColumnName("address_city").HasMaxLength(200).IsRequired().HasColumnType("nvarchar(200)");
+            e.Property(x => x.AddressLine).HasColumnName("address_line").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            e.Property(x => x.DeliveryFee).HasColumnName("delivery_fee").HasColumnType("decimal(10,2)");
+            e.Property(x => x.Total).HasColumnName("total").HasColumnType("decimal(10,2)");
+            e.Property(x => x.BostaTrackingId).HasColumnName("bosta_tracking_id").HasMaxLength(100).HasColumnType("varchar(100)");
+            e.Property(x => x.StateChangedAt).HasColumnName("state_changed_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.CancelledAt).HasColumnName("cancelled_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.DeliveredAt).HasColumnName("delivered_at").HasColumnType("datetime2(3)");
+            e.Property(x => x.PickedUpAt).HasColumnName("picked_up_at").HasColumnType("datetime2(3)");
+
+            e.HasIndex(x => x.TrackingTokenHash).IsUnique();
+            e.HasIndex(x => new { x.State, x.StateChangedAt }).HasFilter("[state] IN (1, 2, 8)");
+            e.HasIndex(x => x.CustomerPhone);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.State);
+        });
+
+        modelBuilder.Entity<OrderItem>(e =>
+        {
+            e.ToTable("order_item", t => t.HasCheckConstraint("CK_order_item_qty", "[qty] > 0"));
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.OrderId).HasColumnName("order_id").HasColumnType("bigint");
+            e.Property(x => x.VariantId).HasColumnName("variant_id").HasColumnType("bigint");
+            e.Property(x => x.Qty).HasColumnName("qty").IsRequired();
+            e.Property(x => x.UnitPriceSnapshot).HasColumnName("unit_price_snapshot").HasColumnType("decimal(10,2)").IsRequired();
+            e.Property(x => x.LineTotalSnapshot).HasColumnName("line_total_snapshot").HasColumnType("decimal(10,2)").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.Order).WithMany(o => o.Items).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.Variant).WithMany().HasForeignKey(x => x.VariantId).OnDelete(DeleteBehavior.NoAction);
+
+            e.HasIndex(x => x.OrderId);
+            e.HasIndex(x => x.VariantId);
+        });
+
+        modelBuilder.Entity<EmailLog>(e =>
+        {
+            e.ToTable("email_log");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.OrderId).HasColumnName("order_id").HasColumnType("bigint");
+            e.Property(x => x.VariantId).HasColumnName("variant_id").HasColumnType("bigint");
+            e.Property(x => x.Recipient).HasColumnName("recipient").HasMaxLength(200).IsRequired().HasColumnType("varchar(200)");
+            e.Property(x => x.Template).HasColumnName("template").HasMaxLength(50).IsRequired().HasColumnType("varchar(50)");
+            e.Property(x => x.Status).HasColumnName("status").HasColumnType("tinyint").HasDefaultValue(EmailStatus.Pending);
+            e.Property(x => x.Error).HasColumnName("error").HasColumnType("nvarchar(max)");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasIndex(x => new { x.Status, x.CreatedAt });
+            e.HasIndex(x => x.OrderId);
         });
 
         var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
