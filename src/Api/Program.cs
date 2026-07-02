@@ -13,6 +13,7 @@ using Oz.Infrastructure.Repositories;
 using Oz.Domain.Repositories;
 using Oz.Api.Filters;
 using Oz.Api.Middleware;
+using Oz.Api.Jobs;
 using Oz.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -119,6 +120,12 @@ builder.Services.AddAuthorization();
 // Application services
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuditLogService>();
+
+// Email service
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+
+// Hangfire jobs
+builder.Services.AddScoped<SendOrderConfirmationJob>();
 
 // Seed initial admin on first run
 builder.Services.AddHostedService<AdminInitializer>();
