@@ -121,6 +121,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuditLogService>();
 
+// Generic repository
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
 // Email service
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
