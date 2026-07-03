@@ -138,7 +138,20 @@ public class OrdersController : ControllerBase
         var domain = $"{Request.Scheme}://{Request.Host}";
         var trackingUrl = $"{domain}/orders/{token}";
 
-        _jobs.Enqueue<SendOrderConfirmationJob>(j => j.ExecuteAsync(order.Id, order.CustomerEmail, token, trackingUrl));
+        var confirmationHtml = $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Order Confirmed</title></head>
+        <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+            <h1>Order Confirmed!</h1>
+            <p>Your order <strong>#{order.Id}</strong> has been placed.</p>
+            <p><a href="{trackingUrl}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Track Your Order</a></p>
+            <p><strong>Important:</strong> Save this link to check your order status later.</p>
+            <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+        </body>
+        </html>
+        """;
+        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Confirmed", confirmationHtml));
 
         return CreatedAtAction(null, null, new PlaceOrderResponse
         {

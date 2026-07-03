@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Oz.Api.Helpers;
 using Oz.Api.Services;
 using Oz.Domain.Entities;
 using Oz.Infrastructure.Data;
@@ -42,30 +43,6 @@ public class AdminOrdersController : ControllerBase
         (OrderState.CodFailed, OrderState.ReturnedToStore),
         (OrderState.ReturnedToStore, OrderState.ClosedFailed),
         (OrderState.PickedUp, OrderState.ClosedSuccess),
-    };
-
-    private static string StateToString(OrderState state) => state switch
-    {
-        OrderState.Placed => "placed",
-        OrderState.ReadyToShip => "ready_to_ship",
-        OrderState.HandedToCourier => "handed_to_courier",
-        OrderState.InTransit => "in_transit",
-        OrderState.Delivered => "delivered",
-        OrderState.CodFailed => "cod_failed",
-        OrderState.ReturnedToStore => "returned_to_store",
-        OrderState.ReadyForPickup => "ready_for_pickup",
-        OrderState.PickedUp => "picked_up",
-        OrderState.ClosedSuccess => "closed_success",
-        OrderState.ClosedFailed => "closed_failed",
-        OrderState.Cancelled => "cancelled",
-        _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
-    };
-
-    private static string ChannelToString(OrderChannel channel) => channel switch
-    {
-        OrderChannel.Delivery => "delivery",
-        OrderChannel.Pickup => "pickup",
-        _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
     };
 
     private static OrderState? TryParseState(string input)
@@ -126,8 +103,8 @@ public class AdminOrdersController : ControllerBase
             .Select(o => new
             {
                 id = o.Id,
-                state = StateToString(o.State),
-                channel = ChannelToString(o.Channel),
+                state = OrderHelpers.StateToString(o.State),
+                channel = OrderHelpers.ChannelToString(o.Channel),
                 customerName = o.CustomerName,
                 customerPhone = o.CustomerPhone,
                 total = o.Total,
@@ -180,20 +157,16 @@ public class AdminOrdersController : ControllerBase
         if (order.State != OrderState.ReadyForPickup || order.Channel != OrderChannel.Pickup)
             return Conflict(new { error = "Invalid state or channel" });
 
-        var before = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
+        var before = JsonSerializer.Serialize(new { order.Id, state = OrderHelpers.StateToString(order.State), order.StateChangedAt });
         var now = DateTime.UtcNow;
 
-        order.State = OrderState.PickedUp;
+        order.State = OrderState.ClosedSuccess;
         order.PickedUpAt = now;
         order.StateChangedAt = now;
 
         await _db.SaveChangesAsync();
 
-        order.State = OrderState.ClosedSuccess;
-
-        await _db.SaveChangesAsync();
-
-        var after = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
+        var after = JsonSerializer.Serialize(new { order.Id, state = OrderHelpers.StateToString(order.State), order.StateChangedAt });
         await _auditLog.WriteAsync(GetActorId(), "order.picked_up", "order", id.ToString(), before, after);
 
         return Ok(ToDetail(order, null));
@@ -216,9 +189,9 @@ public class AdminOrdersController : ControllerBase
         if (order == null) return NotFound();
 
         if (!ValidTransitions.Contains((order.State, target.Value)))
-            return Conflict(new { error = "Invalid transition", from = StateToString(order.State), to = request.ToState });
+            return Conflict(new { error = "Invalid transition", from = OrderHelpers.StateToString(order.State), to = request.ToState });
 
-        var before = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
+        var before = JsonSerializer.Serialize(new { order.Id, state = OrderHelpers.StateToString(order.State), order.StateChangedAt });
         var now = DateTime.UtcNow;
 
         order.State = target.Value;
@@ -251,7 +224,7 @@ public class AdminOrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        var after = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
+        var after = JsonSerializer.Serialize(new { order.Id, state = OrderHelpers.StateToString(order.State), order.StateChangedAt });
         await _auditLog.WriteAsync(GetActorId(), $"order.transition.{request.ToState}", "order", id.ToString(), before, after);
 
         return Ok(ToDetail(order, null));
@@ -273,8 +246,8 @@ public class AdminOrdersController : ControllerBase
         var result = new Dictionary<string, object?>
         {
             ["id"] = order.Id,
-            ["state"] = StateToString(order.State),
-            ["channel"] = ChannelToString(order.Channel),
+            ["state"] = OrderHelpers.StateToString(order.State),
+            ["channel"] = OrderHelpers.ChannelToString(order.Channel),
             ["customerName"] = order.CustomerName,
             ["customerPhone"] = order.CustomerPhone,
             ["customerEmail"] = order.CustomerEmail,

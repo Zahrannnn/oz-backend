@@ -20,15 +20,14 @@ public class AdminInitializer : IHostedService
 
         if (!await db.Admins.AnyAsync(cancellationToken))
         {
-            var salt = BCrypt.Net.BCrypt.GenerateSalt(12);
-            var hash = BCrypt.Net.BCrypt.HashPassword("admin123", salt);
+            var hash = BCrypt.Net.BCrypt.HashPassword("admin123", 12);
 
             db.Admins.Add(new Admin
             {
                 Id = Guid.NewGuid(),
                 Email = "admin@oz.com",
                 PasswordHash = hash,
-                PasswordSalt = salt
+                PasswordSalt = ""
             });
             await db.SaveChangesAsync(cancellationToken);
             Console.WriteLine("[AdminInitializer] Default admin created: admin@oz.com / admin123");

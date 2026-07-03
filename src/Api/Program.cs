@@ -131,11 +131,7 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddHttpClient<IBostaClient, BostaClient>();
 
 // Hangfire jobs
-builder.Services.AddScoped<SendOrderConfirmationJob>();
-builder.Services.AddScoped<SendOrderShippedEmailJob>();
-builder.Services.AddScoped<SendOrderDeliveredEmailJob>();
-builder.Services.AddScoped<SendCodFailedEmailJob>();
-builder.Services.AddScoped<SendOrderCancelledEmailJob>();
+builder.Services.AddScoped<SendEmailJob>();
 builder.Services.AddScoped<AutoCancelOrdersJob>();
 
 // Seed initial admin on first run

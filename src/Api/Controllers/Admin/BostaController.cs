@@ -4,6 +4,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Oz.Api.Helpers;
 using Oz.Api.Jobs;
 using Oz.Api.Services;
 using Oz.Domain.Entities;
@@ -71,7 +72,20 @@ public class BostaController : ControllerBase
             await _auditLog.WriteAsync(GetActorId(), "order.bosta_pickup", "order", id.ToString(), before, after);
 
             var trackingUrl = $"https://bosta.co/tracking/{trackingId}";
-            _jobs.Enqueue<SendOrderShippedEmailJob>(j => j.ExecuteAsync(order.Id, order.CustomerEmail, trackingId, trackingUrl));
+            var shippedHtml = $"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"><title>Order Shipped</title></head>
+            <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+                <h1>Order Shipped!</h1>
+                <p>Your order <strong>#{order.Id}</strong> has been shipped.</p>
+                <p>Bosta Tracking ID: <strong>{trackingId}</strong></p>
+                <p><a href="{trackingUrl}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Track Your Order</a></p>
+                <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+            </body>
+            </html>
+            """;
+            _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Shipped", shippedHtml));
 
             return Ok(ToDetail(order));
         }
@@ -97,8 +111,8 @@ public class BostaController : ControllerBase
         return new
         {
             id = order.Id,
-            state = StateToString(order.State),
-            channel = ChannelToString(order.Channel),
+            state = OrderHelpers.StateToString(order.State),
+            channel = OrderHelpers.ChannelToString(order.Channel),
             customerName = order.CustomerName,
             customerPhone = order.CustomerPhone,
             customerEmail = order.CustomerEmail,
@@ -113,28 +127,4 @@ public class BostaController : ControllerBase
             items
         };
     }
-
-    private static string StateToString(OrderState state) => state switch
-    {
-        OrderState.Placed => "placed",
-        OrderState.ReadyToShip => "ready_to_ship",
-        OrderState.HandedToCourier => "handed_to_courier",
-        OrderState.InTransit => "in_transit",
-        OrderState.Delivered => "delivered",
-        OrderState.CodFailed => "cod_failed",
-        OrderState.ReturnedToStore => "returned_to_store",
-        OrderState.ReadyForPickup => "ready_for_pickup",
-        OrderState.PickedUp => "picked_up",
-        OrderState.ClosedSuccess => "closed_success",
-        OrderState.ClosedFailed => "closed_failed",
-        OrderState.Cancelled => "cancelled",
-        _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
-    };
-
-    private static string ChannelToString(OrderChannel channel) => channel switch
-    {
-        OrderChannel.Delivery => "delivery",
-        OrderChannel.Pickup => "pickup",
-        _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
-    };
 }

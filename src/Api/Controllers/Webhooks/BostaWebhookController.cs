@@ -91,18 +91,26 @@ public class BostaWebhookController : ControllerBase
                 if (order.State != OrderState.InTransit)
                     return Ok(new { status = "ok", note = "unexpected_state" });
 
-                order.State = OrderState.Delivered;
+                order.State = OrderState.ClosedSuccess;
                 order.StateChangedAt = now;
                 order.DeliveredAt = now;
                 await _db.SaveChangesAsync();
                 await _auditLog.WriteAsync(Guid.Empty, "order.webhook.delivered", "order", order.Id.ToString());
 
-                order.State = OrderState.ClosedSuccess;
-                order.StateChangedAt = now;
-                await _db.SaveChangesAsync();
-                await _auditLog.WriteAsync(Guid.Empty, "order.webhook.closed_success", "order", order.Id.ToString());
-
-                _jobs.Enqueue<SendOrderDeliveredEmailJob>(j => j.ExecuteAsync(order.Id, order.CustomerEmail, trackingUrl));
+                var deliveredHtml = $"""
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"><title>Order Delivered</title></head>
+                <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+                    <h1>Order Delivered!</h1>
+                    <p>Your order <strong>#{order.Id}</strong> has been delivered.</p>
+                    <p>Thank you for shopping with us!</p>
+                    <p><a href="{trackingUrl}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">View Order</a></p>
+                    <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+                </body>
+                </html>
+                """;
+                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Delivered", deliveredHtml));
                 break;
 
             case "cod_failed":
@@ -118,7 +126,19 @@ public class BostaWebhookController : ControllerBase
                 await _db.SaveChangesAsync();
                 await _auditLog.WriteAsync(Guid.Empty, "order.webhook.cod_failed", "order", order.Id.ToString());
 
-                _jobs.Enqueue<SendCodFailedEmailJob>(j => j.ExecuteAsync(order.Id, order.CustomerEmail, trackingUrl));
+                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Payment Failed", $"""
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"><title>Payment Failed</title></head>
+                <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+                    <h1>Payment Failed</h1>
+                    <p>Payment for order <strong>#{order.Id}</strong> (cash on delivery) failed.</p>
+                    <p>We will contact you to arrange an alternative payment method.</p>
+                    <p><a href="{trackingUrl}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">View Order</a></p>
+                    <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+                </body>
+                </html>
+                """));
                 break;
 
             case "returned_to_store":
@@ -150,7 +170,19 @@ public class BostaWebhookController : ControllerBase
                 await _db.SaveChangesAsync();
                 await _auditLog.WriteAsync(Guid.Empty, "order.webhook.closed_failed", "order", order.Id.ToString());
 
-                _jobs.Enqueue<SendOrderCancelledEmailJob>(j => j.ExecuteAsync(order.Id, order.CustomerEmail, "Returned to store", trackingUrl));
+                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Cancelled", $"""
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"><title>Order Cancelled</title></head>
+                <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+                    <h1>Order Cancelled</h1>
+                    <p>Your order <strong>#{order.Id}</strong> has been cancelled.</p>
+                    <p>Reason: Returned to store</p>
+                    <p><a href="{trackingUrl}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">View Order</a></p>
+                    <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+                </body>
+                </html>
+                """));
                 break;
 
             default:

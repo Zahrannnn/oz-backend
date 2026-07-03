@@ -29,12 +29,12 @@ public class SmtpEmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task SendOrderConfirmationAsync(string to, string subject, string htmlBody)
+    public async Task SendAsync(string to, string subject, string htmlBody)
     {
         if (string.IsNullOrEmpty(_host) || string.IsNullOrEmpty(_user) || string.IsNullOrEmpty(_pass))
         {
             _logger.LogInformation("[Email] SMTP not configured. Would send to {To}: {Subject}", to, subject);
-            await LogSendAsync(to, "order_confirmation", null, null);
+            await LogSendAsync(to, subject, null, null);
             return;
         }
 
@@ -50,12 +50,12 @@ public class SmtpEmailService : IEmailService
             await client.SendMailAsync(msg);
 
             _logger.LogInformation("[Email] Sent to {To}: {Subject}", to, subject);
-            await LogSendAsync(to, "order_confirmation", null, EmailStatus.Success);
+            await LogSendAsync(to, subject, null, EmailStatus.Success);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[Email] Failed to send to {To}", to);
-            await LogSendAsync(to, "order_confirmation", ex.Message, EmailStatus.Failed);
+            await LogSendAsync(to, subject, ex.Message, EmailStatus.Failed);
             throw;
         }
     }

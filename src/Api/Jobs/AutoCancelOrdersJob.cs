@@ -55,8 +55,18 @@ public class AutoCancelOrdersJob
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
 
-            _jobs.Enqueue<SendOrderCancelledEmailJob>(
-                j => j.ExecuteAsync(order.Id, order.CustomerEmail, "Auto-cancelled (5 days inactive)", ""));
+            _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Cancelled", $"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"><title>Order Cancelled</title></head>
+            <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+                <h1>Order Cancelled</h1>
+                <p>Your order <strong>#{order.Id}</strong> has been cancelled.</p>
+                <p>Reason: Auto-cancelled (5 days inactive)</p>
+                <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+            </body>
+            </html>
+            """));
         }
     }
 }
