@@ -191,6 +191,63 @@ namespace Oz.Infrastructure.Migrations
                     b.ToTable("email_log", (string)null);
                 });
 
+            modelBuilder.Entity("Oz.Domain.Entities.Exchange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<long>("NewVariantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("new_variant_id");
+
+                    b.Property<long>("OldVariantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("old_variant_id");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_id");
+
+                    b.Property<long>("OrderItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_item_id");
+
+                    b.Property<decimal>("PriceDelta")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("price_delta");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("int")
+                        .HasColumnName("qty");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NewVariantId");
+
+                    b.HasIndex("OldVariantId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.ToTable("exchange", (string)null);
+                });
+
             modelBuilder.Entity("Oz.Domain.Entities.GradeStage", b =>
                 {
                     b.Property<long>("Id")
@@ -304,6 +361,52 @@ namespace Oz.Infrastructure.Migrations
                             Name = "FS6",
                             SchoolId = 1L
                         });
+                });
+
+            modelBuilder.Entity("Oz.Domain.Entities.IdempotencyKey", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2(3)")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<string>("ResponseBody")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("response_body");
+
+                    b.Property<int>("ResponseStatus")
+                        .HasColumnType("int")
+                        .HasColumnName("response_status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("idempotency_key", (string)null);
                 });
 
             modelBuilder.Entity("Oz.Domain.Entities.ItemType", b =>
@@ -942,6 +1045,41 @@ namespace Oz.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_variant_threshold_nonneg", "[low_stock_threshold] >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Oz.Domain.Entities.Exchange", b =>
+                {
+                    b.HasOne("Oz.Domain.Entities.Variant", "NewVariant")
+                        .WithMany()
+                        .HasForeignKey("NewVariantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Oz.Domain.Entities.Variant", "OldVariant")
+                        .WithMany()
+                        .HasForeignKey("OldVariantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Oz.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Oz.Domain.Entities.OrderItem", "OrderItem")
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("NewVariant");
+
+                    b.Navigation("OldVariant");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("OrderItem");
                 });
 
             modelBuilder.Entity("Oz.Domain.Entities.GradeStage", b =>
