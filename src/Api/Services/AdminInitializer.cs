@@ -18,6 +18,8 @@ public class AdminInitializer : IHostedService
         using var scope = _services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        await db.Database.MigrateAsync(cancellationToken);
+
         if (!await db.Admins.AnyAsync(cancellationToken))
         {
             var hash = BCrypt.Net.BCrypt.HashPassword("admin123", 12);
