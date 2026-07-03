@@ -23,5 +23,7 @@ Base URL: `http://localhost:5000` (dev)
 | [admin-products.md](api/admin-products.md) | Admin — Products | product + variant CRUD, images, stock edit |
 | [admin-catalog.md](api/admin-catalog.md) | Admin — Catalog | grade-stage + item-type CRUD |
 | [admin-dashboard.md](api/admin-dashboard.md) | Admin — Dashboard | `GET /dashboard` |
+| [admin-orders.md](api/admin-orders.md) | Admin — Orders | list, detail, transition, bosta-pickup, mark-picked-up, run-auto-cancel |
 | [admin-audit.md](api/admin-audit.md) | Admin — Audit Log | list + CSV export |
+| [webhooks.md](api/webhooks.md) | Webhooks | Bosta tracking webhook |
 | [entity-reference.md](api/entity-reference.md) | Entity Reference | enums, field types |
