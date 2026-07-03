@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<Exchange> Exchanges => Set<Exchange>();
+    public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -293,6 +294,21 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.NewVariant).WithMany().HasForeignKey(x => x.NewVariantId).OnDelete(DeleteBehavior.NoAction);
 
             e.HasIndex(x => x.OrderId);
+        });
+
+        modelBuilder.Entity<IdempotencyKey>(e =>
+        {
+            e.ToTable("idempotency_key");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.Key).HasColumnName("key").HasMaxLength(255).IsRequired().HasColumnType("nvarchar(255)");
+            e.Property(x => x.RequestHash).HasColumnName("request_hash").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            e.Property(x => x.ResponseStatus).HasColumnName("response_status");
+            e.Property(x => x.ResponseBody).HasColumnName("response_body").HasColumnType("nvarchar(max)");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at").HasColumnType("datetime2(3)").IsRequired();
+
+            e.HasIndex(x => x.Key).IsUnique();
         });
 
         var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
