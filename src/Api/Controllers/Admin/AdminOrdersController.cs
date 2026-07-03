@@ -180,7 +180,7 @@ public class AdminOrdersController : ControllerBase
         if (order.State != OrderState.ReadyForPickup || order.Channel != OrderChannel.Pickup)
             return Conflict(new { error = "Invalid state or channel" });
 
-        var before = JsonSerializer.Serialize(order);
+        var before = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
         var now = DateTime.UtcNow;
 
         order.State = OrderState.PickedUp;
@@ -193,7 +193,7 @@ public class AdminOrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        var after = JsonSerializer.Serialize(order);
+        var after = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
         await _auditLog.WriteAsync(GetActorId(), "order.picked_up", "order", id.ToString(), before, after);
 
         return Ok(ToDetail(order, null));
@@ -218,7 +218,7 @@ public class AdminOrdersController : ControllerBase
         if (!ValidTransitions.Contains((order.State, target.Value)))
             return Conflict(new { error = "Invalid transition", from = StateToString(order.State), to = request.ToState });
 
-        var before = JsonSerializer.Serialize(order);
+        var before = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
         var now = DateTime.UtcNow;
 
         order.State = target.Value;
@@ -251,7 +251,7 @@ public class AdminOrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        var after = JsonSerializer.Serialize(order);
+        var after = JsonSerializer.Serialize(new { order.Id, state = StateToString(order.State), order.StateChangedAt });
         await _auditLog.WriteAsync(GetActorId(), $"order.transition.{request.ToState}", "order", id.ToString(), before, after);
 
         return Ok(ToDetail(order, null));

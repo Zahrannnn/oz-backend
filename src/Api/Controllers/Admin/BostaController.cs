@@ -57,7 +57,7 @@ public class BostaController : ControllerBase
                 order.AddressLine ?? "",
                 order.Total);
 
-            var before = JsonSerializer.Serialize(order);
+            var before = JsonSerializer.Serialize(new { order.Id, state = order.State.ToString(), order.BostaTrackingId });
             var now = DateTime.UtcNow;
 
             order.BostaTrackingId = trackingId;
@@ -67,7 +67,7 @@ public class BostaController : ControllerBase
 
             await _db.SaveChangesAsync();
 
-            var after = JsonSerializer.Serialize(order);
+            var after = JsonSerializer.Serialize(new { order.Id, state = order.State.ToString(), order.BostaTrackingId });
             await _auditLog.WriteAsync(GetActorId(), "order.bosta_pickup", "order", id.ToString(), before, after);
 
             var trackingUrl = $"https://bosta.co/tracking/{trackingId}";
