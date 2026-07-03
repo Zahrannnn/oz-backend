@@ -1,7 +1,7 @@
 ---
-description: Sprint task builder using DeepSeek V4 Flash Free. Implements backend endpoints, DTOs, controllers, and migrations for the oz-backend .NET 10 project. Use for delegated implementation tasks.
+description: Sprint task builder using DeepSeek V4 Flash. Implements backend endpoints, DTOs, controllers, and migrations for the oz-backend .NET 10 project. Use for delegated implementation tasks.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: opencode/deepseek-v4-flash
 color: "#4CAF50"
 permission:
   edit: allow
@@ -43,3 +43,12 @@ You are a backend implementation agent for the oz-backend project (.NET 10 Web A
 - Build with `dotnet build` before reporting done.
 - If a migration is needed, use `dotnet ef migrations add <Name> --project src/Infrastructure` and `dotnet ef database update`.
 - Keep responses concise. Return the list of files created/modified.
+
+## Anti-patterns (do NOT reintroduce)
+- Do NOT create separate email job classes. Use the single `SendEmailJob` with inline HTML at call site.
+- Do NOT duplicate `StateToString`/`ChannelToString`. Use `OrderHelpers.StateToString()` / `OrderHelpers.ChannelToString()` from `src/Api/Helpers/OrderHelpers.cs`.
+- Do NOT serialize full entity objects for audit logs (causes JSON cycles). Serialize flat anonymous objects: `JsonSerializer.Serialize(new { order.Id, state, ... })`.
+- Do NOT create validator classes unless they are wired via FluentValidation auto-validation.
+- Do NOT create interfaces with only one implementation unless testing requires it.
+- Do NOT call `SaveChangesAsync()` twice for a single state transition. Set final state, save once.
+- Do NOT create placeholder/dead code files. If SMTP or Bosta is unconfigured, handle inline.
