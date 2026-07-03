@@ -127,8 +127,16 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 // Email service
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
+// Bosta client
+builder.Services.AddHttpClient<IBostaClient, BostaClient>();
+
 // Hangfire jobs
 builder.Services.AddScoped<SendOrderConfirmationJob>();
+builder.Services.AddScoped<SendOrderShippedEmailJob>();
+builder.Services.AddScoped<SendOrderDeliveredEmailJob>();
+builder.Services.AddScoped<SendCodFailedEmailJob>();
+builder.Services.AddScoped<SendOrderCancelledEmailJob>();
+builder.Services.AddScoped<AutoCancelOrdersJob>();
 
 // Seed initial admin on first run
 builder.Services.AddHostedService<AdminInitializer>();
@@ -195,10 +203,15 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 
 app.MapControllers();
 
-// Recurring job placeholder
+// Recurring jobs
 RecurringJob.AddOrUpdate(
     "heartbeat",
     () => Console.WriteLine($"[Hangfire heartbeat] {DateTime.UtcNow:O}"),
     Cron.Minutely);
+
+RecurringJob.AddOrUpdate<AutoCancelOrdersJob>(
+    "auto-cancel-orders",
+    job => job.ExecuteAsync(),
+    Cron.Daily(3));
 
 app.Run();

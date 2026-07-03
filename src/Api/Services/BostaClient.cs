@@ -9,11 +9,13 @@ public class BostaClient : IBostaClient
     private readonly string? _apiKey;
     private readonly ILogger<BostaClient> _logger;
 
-    public BostaClient(IConfiguration config, ILogger<BostaClient> logger)
+    public BostaClient(HttpClient http, IConfiguration config, ILogger<BostaClient> logger)
     {
+        _http = http;
         _apiKey = config["Bosta:ApiKey"] ?? Environment.GetEnvironmentVariable("BOSTA_API_KEY");
         _logger = logger;
-        _http = new HttpClient { BaseAddress = new Uri(config["Bosta:BaseUrl"] ?? "https://stg.bosta.co/api/v1/") };
+        if (_http.BaseAddress == null)
+            _http.BaseAddress = new Uri(config["Bosta:BaseUrl"] ?? "https://stg.bosta.co/api/v1/");
     }
 
     public async Task<string> CreateShipmentAsync(long orderId, string customerName, string customerPhone, string addressLine, decimal codAmount)
