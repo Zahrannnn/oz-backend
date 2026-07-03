@@ -243,4 +243,79 @@ public class OrdersController : ControllerBase
             }).ToList()
         });
     }
+
+    [HttpPost("by-token/{token}/cancel")]
+    public async Task<IActionResult> CancelOrderByToken(string token, [FromBody] CancelOrderRequest request)
+    {
+        var normalizedToken = token.Replace('-', '+').Replace('_', '/');
+        var padding = (4 - normalizedToken.Length % 4) % 4;
+        normalizedToken += new string('=', padding);
+
+        byte[] tokenBytes;
+        try { tokenBytes = Convert.FromBase64String(normalizedToken); }
+        catch { return NotFound(); }
+
+        var tokenHash = SHA256.HashData(tokenBytes);
+
+        var order = await _db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Variant)
+            .FirstOrDefaultAsync(o => o.TrackingTokenHash == tokenHash);
+
+        if (order == null)
+            return NotFound();
+
+        if (order.State != OrderState.Placed && order.State != OrderState.ReadyToShip && order.State != OrderState.ReadyForPickup)
+        {
+            return Conflict(new
+            {
+                type = "https://tools.ietf.org/html/rfc7807",
+                status = 409,
+                detail = $"Order cannot be cancelled in state {order.State}"
+            });
+        }
+
+        var now = DateTime.UtcNow;
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        order.State = OrderState.Cancelled;
+        order.CancelledAt = now;
+        order.StateChangedAt = now;
+
+        foreach (var item in order.Items)
+        {
+            item.Variant.Stock += item.Qty;
+            item.Variant.UpdatedAt = now;
+        }
+
+        _db.AuditLogs.Add(new AuditLog
+        {
+            ActorId = Guid.Empty,
+            Action = "order.cancel",
+            EntityType = "order",
+            EntityId = order.Id.ToString(),
+            AfterJson = JsonSerializer.Serialize(new { state = "cancelled", reason = request.Reason }),
+            CreatedAt = now
+        });
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        var reasonText = string.IsNullOrWhiteSpace(request.Reason) ? "Requested by customer" : request.Reason;
+        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Cancelled", $"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Order Cancelled</title></head>
+        <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
+            <h1>Order Cancelled</h1>
+            <p>Your order <strong>#{order.Id}</strong> has been cancelled.</p>
+            <p>Reason: {reasonText}</p>
+            <hr /><p style="color:#666;font-size:12px;">Oz School Uniforms</p>
+        </body>
+        </html>
+        """));
+
+        return Ok(new { state = "cancelled" });
+    }
 }
