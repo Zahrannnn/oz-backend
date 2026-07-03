@@ -1,7 +1,7 @@
 ---
 description: Execute a sprint from BE_TASKS.md — delegate to sprint-builder agents, commit, verify.
 agent: build
-model: opencode/deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 ---
 
 Read `BE_TASKS.md` and find the next uncompleted sprint (Sprint $ARGUMENTS if specified, otherwise next sequential).

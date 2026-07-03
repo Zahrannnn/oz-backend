@@ -1,7 +1,7 @@
 ---
 description: Sprint task builder using DeepSeek V4 Flash. Implements backend endpoints, DTOs, controllers, and migrations for the oz-backend .NET 10 project. Use for delegated implementation tasks.
 mode: subagent
-model: opencode/deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 color: "#4CAF50"
 permission:
   edit: allow
