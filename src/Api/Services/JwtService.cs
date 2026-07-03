@@ -14,7 +14,7 @@ public class JwtService
 
     public JwtService(IConfiguration configuration)
     {
-        _secret = configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT secret not configured");
+        _secret = configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? throw new InvalidOperationException("JWT secret not configured");
         _issuer = configuration["Jwt:Issuer"] ?? "oz-api";
         _audience = configuration["Jwt:Audience"] ?? "oz-admin";
     }
