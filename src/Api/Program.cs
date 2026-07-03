@@ -120,6 +120,7 @@ builder.Services.AddAuthorization();
 // Application services
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<IdempotencyService>();
 
 // Generic repository
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -133,6 +134,7 @@ builder.Services.AddHttpClient<IBostaClient, BostaClient>();
 // Hangfire jobs
 builder.Services.AddScoped<SendEmailJob>();
 builder.Services.AddScoped<AutoCancelOrdersJob>();
+builder.Services.AddScoped<SendNotifyMeEmailsJob>();
 
 // Seed initial admin on first run
 builder.Services.AddHostedService<AdminInitializer>();
@@ -142,6 +144,7 @@ var app = builder.Build();
 // Middleware pipeline
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseSecurityHeaders();
+app.UseMiddleware<RateLimitingMiddleware>();
 app.UseCors();
 
 // Static files - serve product images from /uploads (content-root relative)

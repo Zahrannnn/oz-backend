@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Oz.Api.DTOs;
+using Oz.Api.Jobs;
 using Oz.Api.Services;
 using Oz.Domain.Entities;
 using Oz.Infrastructure.Data;
@@ -18,11 +20,13 @@ public class ProductAdminController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly AuditLogService _auditLog;
+    private readonly IBackgroundJobClient _jobs;
 
-    public ProductAdminController(AppDbContext db, AuditLogService auditLog)
+    public ProductAdminController(AppDbContext db, AuditLogService auditLog, IBackgroundJobClient jobs)
     {
         _db = db;
         _auditLog = auditLog;
+        _jobs = jobs;
     }
 
     private Guid GetActorId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -246,7 +250,8 @@ public class ProductAdminController : ControllerBase
         var after = JsonSerializer.Serialize(variant);
         await _auditLog.WriteAsync(GetActorId(), "stock.edit", "variant", id.ToString(), before, after, request.Reason);
 
-        // TODO: if (oldStock == 0 && request.Stock > 0) enqueue SendNotifyMeEmailsJob
+        if (oldStock == 0 && request.Stock > 0)
+            _jobs.Enqueue<SendNotifyMeEmailsJob>(j => j.ExecuteAsync(id));
 
         return Ok(variant);
     }
