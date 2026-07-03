@@ -141,6 +141,8 @@ builder.Services.AddHostedService<AdminInitializer>();
 
 var app = builder.Build();
 
+EnvironmentValidator.Validate(builder.Configuration, app.Environment);
+
 // Middleware pipeline
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseSecurityHeaders();

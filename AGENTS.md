@@ -10,7 +10,13 @@ dotnet run --project src/Api                    # start API on http://localhost:
 dotnet ef migrations add <Name> --project src/Infrastructure   # create migration
 dotnet ef database update --project src/Infrastructure          # apply migration
 ```
-Env vars for dev: `ASPNETCORE_ENVIRONMENT=Development`, `BOSTA_API_KEY`, `BOSTA_WEBHOOK_SECRET`
+
+## Environment Variables
+- **Canonical reference**: `.env.example` at repo root
+- **Local dev**: copy `.env.example` to `.env`, fill in values
+- **Production (MonsterASP)**: set in control panel — never commit
+- **Required in non-Development**: `ConnectionStrings__Default`, `JWT_SECRET`, `BOSTA_API_KEY`, `BOSTA_WEBHOOK_SECRET` — startup fails fast if any missing
+- **Convention**: `Section__Key` env var maps to `Section:Key` config (e.g. `ConnectionStrings__Default` → `ConnectionStrings:Default`)
 
 ## Project Structure
 - `src/Api/Controllers/` — Controllers (Storefront/ and Admin/ subdirs)

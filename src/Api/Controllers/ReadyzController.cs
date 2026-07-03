@@ -54,10 +54,17 @@ public class ReadyzController : ControllerBase
             }
         }
 
-        var bostaKey = Environment.GetEnvironmentVariable("Bosta__ApiKey");
+        var bostaKey = Environment.GetEnvironmentVariable("Bosta__ApiKey")
+            ?? Environment.GetEnvironmentVariable("BOSTA_API_KEY");
         if (string.IsNullOrWhiteSpace(bostaKey))
         {
             failures.Add("bosta_api_key_missing");
+        }
+
+        var webhookSecret = Environment.GetEnvironmentVariable("BOSTA_WEBHOOK_SECRET");
+        if (string.IsNullOrWhiteSpace(webhookSecret))
+        {
+            failures.Add("bosta_webhook_secret_missing");
         }
 
         if (failures.Count > 0)

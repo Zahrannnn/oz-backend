@@ -22,4 +22,7 @@
 .DS_Store
 Thumbs.db
 
+## Secrets
+.env
+*.env
 keys.txt
