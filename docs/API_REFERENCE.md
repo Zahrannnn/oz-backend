@@ -1,6 +1,8 @@
 # API Reference — Oz Backend
 
 Base URL: `http://localhost:5000` (dev)
+Base URL: `https://ozuniform.runasp.net` (Prod)
+
 
 ## Conventions
 
