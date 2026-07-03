@@ -55,6 +55,22 @@ Guard: state = ready_for_pickup AND channel = pickup. Else 409.
 Transitions: ready_for_pickup → picked_up → closed_success. Sets pickedUpAt.
 Response 200: order object
 
+## POST /api/v1/admin/orders/{id}/exchanges
+Body:
+```json
+{ "orderItemId": 1, "newVariantId": 2, "qty": 1, "reason": "size swap" }
+```
+Admin-only exchange: refunds old variant stock, deducts new variant stock, recalculates order total, inserts `exchange` row, audit log.
+- 200: `{ "exchangeId": 1, "priceDelta": 10.00, "newTotal": 130.00, "cashSettlement": "parent_pays_10.00" }`
+- 404: order not found
+- 409: new variant out of stock
+- 422: invalid orderItemId / newVariantId / qty
+
+`cashSettlement`:
+- `parent_pays_<abs>` — parent owes money
+- `refund_parent_<abs>` — refund to parent
+- `even` — no money changes hands
+
 ## POST /api/v1/admin/jobs/run-auto-cancel
 Triggers auto-cancel job immediately (admin-only, for testing).
 Response 200: `{ message: "Auto-cancel job completed" }`

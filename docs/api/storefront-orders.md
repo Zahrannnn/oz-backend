@@ -28,4 +28,12 @@ Response 200:
 ```
 404 if token doesn't match.
 
+## POST /api/v1/orders/by-token/{token}/cancel
+Body: `{ "reason": "string (optional)" }`
+
+Parent self-service cancel. Refunds stock, sends cancel email, writes audit log.
+- 200: `{ "state": "cancelled" }`
+- 404: token doesn't match
+- 409: order state not in {placed, ready_to_ship, ready_for_pickup}
+
 Order states: `placed` | `ready_to_ship` | `handed_to_courier` | `in_transit` | `delivered` | `cod_failed` | `returned_to_store` | `ready_for_pickup` | `picked_up` | `closed_success` | `closed_failed` | `cancelled`
