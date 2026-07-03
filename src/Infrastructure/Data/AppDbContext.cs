@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
+    public DbSet<Exchange> Exchanges => Set<Exchange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -269,6 +270,28 @@ public class AppDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
 
             e.HasIndex(x => new { x.Status, x.CreatedAt });
+            e.HasIndex(x => x.OrderId);
+        });
+
+        modelBuilder.Entity<Exchange>(e =>
+        {
+            e.ToTable("exchange");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.OrderId).HasColumnName("order_id").HasColumnType("bigint");
+            e.Property(x => x.OrderItemId).HasColumnName("order_item_id").HasColumnType("bigint");
+            e.Property(x => x.OldVariantId).HasColumnName("old_variant_id").HasColumnType("bigint");
+            e.Property(x => x.NewVariantId).HasColumnName("new_variant_id").HasColumnType("bigint");
+            e.Property(x => x.Qty).HasColumnName("qty").IsRequired();
+            e.Property(x => x.PriceDelta).HasColumnName("price_delta").HasColumnType("decimal(10,2)").IsRequired();
+            e.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(500);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
+
+            e.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.OrderItem).WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.OldVariant).WithMany().HasForeignKey(x => x.OldVariantId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.NewVariant).WithMany().HasForeignKey(x => x.NewVariantId).OnDelete(DeleteBehavior.NoAction);
+
             e.HasIndex(x => x.OrderId);
         });
 
