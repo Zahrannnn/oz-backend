@@ -234,6 +234,7 @@ public class AdminOrdersController : ControllerBase
     {
         var items = order.Items.Select(i => new
         {
+            id = i.Id,
             variantId = i.VariantId,
             qty = i.Qty,
             unitPriceSnapshot = i.UnitPriceSnapshot,

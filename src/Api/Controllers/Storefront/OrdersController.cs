@@ -4,6 +4,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Oz.Api.DTOs;
+using Oz.Api.Helpers;
 using Oz.Api.Jobs;
 using Oz.Domain.Entities;
 using Oz.Infrastructure.Data;
@@ -186,38 +187,42 @@ public class OrdersController : ControllerBase
         if (order == null)
             return NotFound();
 
-        var timeline = await _db.AuditLogs
+        var auditRows = await _db.AuditLogs
             .Where(a => a.EntityType == "order" && a.EntityId == order.Id.ToString() && a.Action.StartsWith("order."))
             .OrderBy(a => a.CreatedAt)
-            .Select(a => new TimelineEntry
-            {
-                State = a.Action.Replace("order.", ""),
-                At = a.CreatedAt
-            })
+            .Select(a => new { a.Action, a.CreatedAt })
             .ToListAsync();
+
+        var timeline = auditRows.Select(a => new TimelineEntry
+        {
+            State = a.Action.StartsWith("order.transition.")
+                ? a.Action["order.transition.".Length..]
+                : a.Action.Replace("order.", ""),
+            At = a.CreatedAt
+        }).ToList();
 
         var stateLabel = order.State switch
         {
-            OrderState.Placed => "Placed",
-            OrderState.ReadyToShip => "Ready to ship",
-            OrderState.HandedToCourier => "Handed to courier",
-            OrderState.InTransit => "In transit",
-            OrderState.Delivered => "Delivered",
-            OrderState.CodFailed => "COD failed",
-            OrderState.ReturnedToStore => "Returned to store",
-            OrderState.ReadyForPickup => "Ready for pickup",
-            OrderState.PickedUp => "Picked up",
-            OrderState.ClosedSuccess => "Closed (success)",
-            OrderState.ClosedFailed => "Closed (failed)",
-            OrderState.Cancelled => "Cancelled",
-            _ => order.State.ToString()
+            OrderState.Placed => "تم الطلب",
+            OrderState.ReadyToShip => "جاهز للشحن",
+            OrderState.HandedToCourier => "سُلم للمندوب",
+            OrderState.InTransit => "في الطريق",
+            OrderState.Delivered => "تم التسليم",
+            OrderState.CodFailed => "فشل التحصيل",
+            OrderState.ReturnedToStore => "مرتجع للمتجر",
+            OrderState.ReadyForPickup => "جاهز للاستلام",
+            OrderState.PickedUp => "تم الاستلام",
+            OrderState.ClosedSuccess => "مكتمل",
+            OrderState.ClosedFailed => "مغلق",
+            OrderState.Cancelled => "ملغى",
+            _ => OrderHelpers.StateToString(order.State)
         };
 
         if (timeline.Count == 0)
         {
             timeline.Add(new TimelineEntry
             {
-                State = order.State.ToString().ToLower(),
+                State = OrderHelpers.StateToString(order.State),
                 At = order.StateChangedAt
             });
         }
@@ -225,7 +230,7 @@ public class OrdersController : ControllerBase
         return Ok(new OrderStatusResponse
         {
             OrderId = order.Id,
-            State = order.State.ToString().ToLower(),
+            State = OrderHelpers.StateToString(order.State),
             StateLabel = stateLabel,
             Channel = order.Channel == OrderChannel.Delivery ? "delivery" : "pickup",
             Total = order.Total,
