@@ -38,42 +38,125 @@ public class ProductAdminController : ControllerBase
         [FromQuery] long? schoolId = null,
         [FromQuery] long? gradeStageId = null,
         [FromQuery] long? itemTypeId = null,
-        [FromQuery] byte? gender = null)
+        [FromQuery] byte? gender = null,
+        [FromQuery(Name = "stock_status")] string? stockStatusFilter = null)
     {
         page = Math.Max(1, page);
         page_size = Math.Clamp(page_size, 1, 100);
 
-        var query = _db.Products.Include(p => p.School).Include(p => p.GradeStage)
-            .Include(p => p.ItemType).AsQueryable();
+        var validFilters = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "in_stock", "low_stock", "out_of_stock" };
+        if (stockStatusFilter != null && !validFilters.Contains(stockStatusFilter))
+            return Problem("Invalid stock_status. Must be: in_stock, low_stock, or out_of_stock.",
+                statusCode: 400);
+
+        var query = _db.Products
+            .Include(p => p.School)
+            .Include(p => p.GradeStage)
+            .Include(p => p.ItemType)
+            .Include(p => p.Variants)
+            .AsQueryable();
 
         if (schoolId.HasValue) query = query.Where(p => p.SchoolId == schoolId.Value);
         if (gradeStageId.HasValue) query = query.Where(p => p.GradeStageId == gradeStageId.Value);
         if (itemTypeId.HasValue) query = query.Where(p => p.ItemTypeId == itemTypeId.Value);
         if (gender.HasValue) query = query.Where(p => (byte)p.Gender == gender.Value);
 
-        var total = await query.CountAsync();
-
-        var items = await query
+        var allItems = await query
             .OrderByDescending(p => p.CreatedAt)
-            .Skip((page - 1) * page_size)
-            .Take(page_size)
             .ToListAsync();
 
-        var dtos = items.Select(p => new
+        var projected = allItems.Select(p =>
         {
-            id = p.Id,
-            schoolName = p.School?.Name,
-            gradeStageName = p.GradeStage?.Name,
-            itemType = p.ItemType?.Name,
-            gender = (byte)p.Gender,
-            color = p.Color,
-            isInSet = p.IsInSet,
-            isArchived = p.IsArchived,
-            createdAt = p.CreatedAt,
-            updatedAt = p.UpdatedAt
+            var activeVariants = p.Variants.Where(v => !v.IsArchived).ToList();
+            var totalStock = activeVariants.Sum(v => v.Stock);
+            var hasLow = activeVariants.Any(v => v.Stock > 0 && v.Stock <= v.LowStockThreshold);
+            var stockStatus = totalStock == 0
+                ? "out_of_stock"
+                : hasLow
+                    ? "low_stock"
+                    : "in_stock";
+
+            return new
+            {
+                product = p,
+                totalStock,
+                stockStatus
+            };
+        });
+
+        if (stockStatusFilter != null)
+            projected = projected.Where(x =>
+                x.stockStatus.Equals(stockStatusFilter, StringComparison.OrdinalIgnoreCase));
+
+        var total = projected.Count();
+
+        var paged = projected
+            .Skip((page - 1) * page_size)
+            .Take(page_size)
+            .ToList();
+
+        var dtos = paged.Select(x =>
+        {
+            var p = x.product;
+            return new
+            {
+                id = p.Id,
+                schoolName = p.School?.Name,
+                gradeStageName = p.GradeStage?.Name,
+                itemType = p.ItemType?.Name,
+                gender = (byte)p.Gender,
+                color = p.Color,
+                isInSet = p.IsInSet,
+                isArchived = p.IsArchived,
+                totalStock = x.totalStock,
+                stockStatus = x.stockStatus,
+                createdAt = p.CreatedAt,
+                updatedAt = p.UpdatedAt
+            };
         });
 
         return Ok(new { items = dtos, total, page, page_size });
+    }
+
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> GetProduct(long id)
+    {
+        var product = await _db.Products
+            .Include(p => p.School)
+            .Include(p => p.GradeStage)
+            .Include(p => p.ItemType)
+            .Include(p => p.Variants)
+            .Include(p => p.Images.OrderBy(i => i.SortOrder))
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (product == null) return NotFound();
+
+        return Ok(new
+        {
+            id = product.Id,
+            schoolId = product.SchoolId,
+            schoolName = product.School?.Name,
+            gradeStageId = product.GradeStageId,
+            gradeStageName = product.GradeStage?.Name,
+            itemTypeId = product.ItemTypeId,
+            itemType = product.ItemType?.Name,
+            gender = (byte)product.Gender,
+            color = product.Color,
+            isInSet = product.IsInSet,
+            isArchived = product.IsArchived,
+            variants = product.Variants.Select(v => new
+            {
+                v.Id, v.SizeLabel, v.PriceInclVat, v.Stock, v.Reserved,
+                v.LowStockThreshold, v.IsArchived, v.CreatedAt, v.UpdatedAt
+            }),
+            images = product.Images.Select(i => new
+            {
+                i.Id, i.ProductId, i.Url, i.SortOrder
+            }),
+            createdAt = product.CreatedAt,
+            updatedAt = product.UpdatedAt
+        });
     }
 
     [HttpPost]

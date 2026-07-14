@@ -108,7 +108,7 @@ public class StorefrontProductsController : ControllerBase
         if (variants.Count == 0 || variants.All(v => v.Stock == 0))
             return "out_of_stock";
 
-        if (variants.Any(v => v.Stock < v.LowStockThreshold))
+        if (variants.Any(v => v.Stock <= v.LowStockThreshold))
             return "low_stock";
 
         return "in_stock";
