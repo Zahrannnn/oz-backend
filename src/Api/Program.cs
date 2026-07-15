@@ -60,7 +60,9 @@ var vercelOrigin = Environment.GetEnvironmentVariable("VERCEL_ORIGIN") ?? "http:
 var allowedOrigins = new[]
 {
     vercelOrigin,
-    "https://oz-frontend.vercel.app"
+    "http://localhost:3001",
+    "https://oz-frontend.vercel.app",
+    "https://oz-storefront.vercel.app"
 };
 builder.Services.AddCors(options =>
 {
