@@ -7,6 +7,9 @@ public class PlaceOrderResponse
     [JsonPropertyName("orderId")]
     public long OrderId { get; set; }
 
+    [JsonPropertyName("orderNumber")]
+    public string OrderNumber { get; set; } = string.Empty;
+
     [JsonPropertyName("token")]
     public string Token { get; set; } = string.Empty;
 

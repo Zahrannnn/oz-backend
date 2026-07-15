@@ -11,7 +11,7 @@ Response: `{ id, name, type, isArchived, createdAt }` | 404
 
 ## POST /api/v1/admin/schools
 Body: `{ "name": "New School", "type": 1 }`
-type: 1=National, 2=Experimental, 3=Arabic, 4=Language, 5=International, 6=Private
+type: 1=Governmental (حكومي), 2=Experimental (تجريبي), 3=Arabic (عربي), 4=Language (لغات), 5=International (دولي), 6=Private (خاص)
 
 ## PUT /api/v1/admin/schools/{id}
 Body: same as POST

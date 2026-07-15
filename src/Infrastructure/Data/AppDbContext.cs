@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Oz.Domain.Entities;
 
@@ -209,6 +209,8 @@ public class AppDbContext : DbContext
             });
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
+            e.Property(x => x.OrderNumber).HasColumnName("order_number").HasMaxLength(20).IsRequired().HasColumnType("varchar(20)");
+            e.Property(x => x.TrackingToken).HasColumnName("tracking_token").HasMaxLength(64).HasColumnType("varchar(64)");
             e.Property(x => x.TrackingTokenHash).HasColumnName("tracking_token_hash").HasColumnType("binary(32)").IsRequired();
             e.Property(x => x.State).HasColumnName("state").HasColumnType("tinyint").IsRequired();
             e.Property(x => x.Channel).HasColumnName("channel").HasColumnType("tinyint").IsRequired();
@@ -314,7 +316,7 @@ public class AppDbContext : DbContext
         var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         modelBuilder.Entity<School>().HasData(
-            new School { Id = 1, Name = "Cairo Language School", Type = SchoolType.Experimental, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate },
+            new School { Id = 1, Name = "Cairo Language School", Type = SchoolType.Language, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate },
             new School { Id = 2, Name = "Alexandria Experimental", Type = SchoolType.Experimental, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate },
             new School { Id = 3, Name = "Giza Arabic School", Type = SchoolType.Arabic, IsArchived = false, CreatedAt = seedDate, UpdatedAt = seedDate }
         );

@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Oz.Infrastructure.Data;
 
 #nullable disable
 
-namespace Oz.Infrastructure.Migrations
+namespace Oz.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260715160557_AddOrderNumber")]
+    partial class AddOrderNumber
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -604,11 +607,6 @@ namespace Oz.Infrastructure.Migrations
                     b.Property<decimal>("Total")
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("total");
-
-                    b.Property<string>("TrackingToken")
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .HasColumnName("tracking_token");
 
                     b.Property<byte[]>("TrackingTokenHash")
                         .IsRequired()

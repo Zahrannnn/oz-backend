@@ -2,7 +2,9 @@ namespace Oz.Api.DTOs;
 
 public record ProductDetailDto(
     long Id,
+    long SchoolId,
     string SchoolName,
+    long GradeStageId,
     string GradeStageName,
     string ItemType,
     byte Gender,

@@ -25,6 +25,8 @@ public enum OrderChannel : byte
 public class Order
 {
     public long Id { get; set; }
+    public string OrderNumber { get; set; } = string.Empty;
+    public string? TrackingToken { get; set; }
     public byte[] TrackingTokenHash { get; set; } = null!;
     public OrderState State { get; set; }
     public OrderChannel Channel { get; set; }

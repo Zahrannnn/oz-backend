@@ -4,7 +4,7 @@
 Query: `?q=search_text&page=1&page_size=20`
 Response 200:
 ```json
-{ "items": [{ "id": 1, "name": "Cairo Language School", "type": "Experimental", "typeLabel": "Experimental" }], "total": 3, "page": 1, "page_size": 20 }
+{ "items": [{ "id": 1, "name": "Cairo Language School", "type": "Language", "typeLabel": "لغات" }], "total": 3, "page": 1, "page_size": 20 }
 ```
 
 ## GET /api/v1/schools/{id}

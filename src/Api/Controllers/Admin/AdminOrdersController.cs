@@ -27,23 +27,37 @@ public class AdminOrdersController : ControllerBase
 
     private Guid GetActorId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    private static readonly HashSet<(OrderState from, OrderState to)> ValidTransitions = new()
+    private static readonly HashSet<(OrderState from, OrderState to)> DeliveryTransitions = new()
     {
         (OrderState.Placed, OrderState.ReadyToShip),
-        (OrderState.Placed, OrderState.ReadyForPickup),
         (OrderState.Placed, OrderState.Cancelled),
         (OrderState.ReadyToShip, OrderState.HandedToCourier),
         (OrderState.ReadyToShip, OrderState.Cancelled),
-        (OrderState.ReadyForPickup, OrderState.PickedUp),
-        (OrderState.ReadyForPickup, OrderState.Cancelled),
         (OrderState.HandedToCourier, OrderState.InTransit),
         (OrderState.InTransit, OrderState.Delivered),
         (OrderState.InTransit, OrderState.CodFailed),
         (OrderState.Delivered, OrderState.ClosedSuccess),
         (OrderState.CodFailed, OrderState.ReturnedToStore),
         (OrderState.ReturnedToStore, OrderState.ClosedFailed),
+    };
+
+    private static readonly HashSet<(OrderState from, OrderState to)> PickupTransitions = new()
+    {
+        (OrderState.Placed, OrderState.ReadyForPickup),
+        (OrderState.Placed, OrderState.Cancelled),
+        (OrderState.ReadyForPickup, OrderState.PickedUp),
+        (OrderState.ReadyForPickup, OrderState.Cancelled),
         (OrderState.PickedUp, OrderState.ClosedSuccess),
     };
+
+    private static HashSet<(OrderState from, OrderState to)> TransitionsFor(OrderChannel channel) =>
+        channel == OrderChannel.Delivery ? DeliveryTransitions : PickupTransitions;
+
+    private static List<string> AvailableStates(OrderState current, OrderChannel channel) =>
+        TransitionsFor(channel)
+            .Where(t => t.from == current)
+            .Select(t => OrderHelpers.StateToString(t.to))
+            .ToList();
 
     private static OrderState? TryParseState(string input)
     {
@@ -103,6 +117,7 @@ public class AdminOrdersController : ControllerBase
             .Select(o => new
             {
                 id = o.Id,
+                orderNumber = o.OrderNumber,
                 state = OrderHelpers.StateToString(o.State),
                 channel = OrderHelpers.ChannelToString(o.Channel),
                 customerName = o.CustomerName,
@@ -188,7 +203,7 @@ public class AdminOrdersController : ControllerBase
 
         if (order == null) return NotFound();
 
-        if (!ValidTransitions.Contains((order.State, target.Value)))
+        if (!TransitionsFor(order.Channel).Contains((order.State, target.Value)))
             return Conflict(new { error = "Invalid transition", from = OrderHelpers.StateToString(order.State), to = request.ToState });
 
         var before = JsonSerializer.Serialize(new { order.Id, state = OrderHelpers.StateToString(order.State), order.StateChangedAt });
@@ -247,6 +262,7 @@ public class AdminOrdersController : ControllerBase
         var result = new Dictionary<string, object?>
         {
             ["id"] = order.Id,
+            ["orderNumber"] = order.OrderNumber,
             ["state"] = OrderHelpers.StateToString(order.State),
             ["channel"] = OrderHelpers.ChannelToString(order.Channel),
             ["customerName"] = order.CustomerName,
@@ -268,6 +284,8 @@ public class AdminOrdersController : ControllerBase
             ["codFailedAt"] = order.CodFailedAt,
             ["items"] = items
         };
+
+        result["availableStates"] = AvailableStates(order.State, order.Channel);
 
         if (timeline != null)
             result["timeline"] = timeline;

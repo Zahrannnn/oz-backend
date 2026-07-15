@@ -1,13 +1,17 @@
-﻿namespace Oz.Domain.Entities;
+namespace Oz.Domain.Entities;
 
+/// <summary>
+/// Canonical school types — unified across admin, storefront, and DB.
+/// Arabic labels: حكومي، تجريبي، عربي، لغات، دولي، خاص
+/// </summary>
 public enum SchoolType : byte
 {
-    Arabic = 1,
+    Governmental = 1,
     Experimental = 2,
-    AzharEldelta = 3,
-    ElHoda = 4,
-    ElTegara = 5,
-    Custom = 6
+    Arabic = 3,
+    Language = 4,
+    International = 5,
+    Private = 6
 }
 
 public class School

@@ -7,6 +7,9 @@ public class OrderStatusResponse
     [JsonPropertyName("orderId")]
     public long OrderId { get; set; }
 
+    [JsonPropertyName("orderNumber")]
+    public string OrderNumber { get; set; } = string.Empty;
+
     [JsonPropertyName("state")]
     public string State { get; set; } = string.Empty;
 

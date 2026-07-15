@@ -90,7 +90,7 @@ Aggregates:
 |--------|------|------|---------|-------|
 | id | BIGINT IDENTITY | NOT NULL |  | PK |
 | name | NVARCHAR(200) | NOT NULL |  | Freeform Arabic / English per admin |
-| type | TINYINT | NOT NULL |  | CHECK in (1=Arabic, 2=Experimental, 3=Azhar_Eldelta, 4=El_Hoda, 5=El_Tegara, 6=Custom) |
+| type | TINYINT | NOT NULL |  | CHECK in (1=Governmental/حكومي, 2=Experimental/تجريبي, 3=Arabic/عربي, 4=Language/لغات, 5=International/دولي, 6=Private/خاص) |
 | is_archived | BIT | NOT NULL | 0 | Soft delete |
 | created_at | DATETIME2(3) | NOT NULL | SYSUTCDATETIME() |  |
 | updated_at | DATETIME2(3) | NOT NULL | SYSUTCDATETIME() |  |

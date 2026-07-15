@@ -34,7 +34,9 @@ public class ProductDetailController : ControllerBase
 
         var dto = new ProductDetailDto(
             product.Id,
+            product.SchoolId,
             product.School.Name,
+            product.GradeStageId,
             product.GradeStage.Name,
             product.ItemType.Name,
             (byte)product.Gender,
