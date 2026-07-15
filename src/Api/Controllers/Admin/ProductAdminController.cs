@@ -333,7 +333,7 @@ public class ProductAdminController : ControllerBase
         var after = JsonSerializer.Serialize(variant);
         await _auditLog.WriteAsync(GetActorId(), "stock.edit", "variant", id.ToString(), before, after, request.Reason);
 
-        if (oldStock == 0 && request.Stock > 0)
+        if (request.Stock > oldStock)
             _jobs.Enqueue<SendNotifyMeEmailsJob>(j => j.ExecuteAsync(id));
 
         return Ok(variant);
