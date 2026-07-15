@@ -57,11 +57,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // CORS - locked to Vercel origin
 var vercelOrigin = Environment.GetEnvironmentVariable("VERCEL_ORIGIN") ?? "http://localhost:3000";
+var allowedOrigins = new[]
+{
+    vercelOrigin,
+    "https://oz-frontend.vercel.app"
+};
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(vercelOrigin)
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
