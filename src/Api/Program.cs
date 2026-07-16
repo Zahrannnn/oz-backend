@@ -55,11 +55,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         ?? Environment.GetEnvironmentVariable("ConnectionStrings__Default")
         ?? throw new InvalidOperationException("Connection string 'Default' not configured.")));
 
-// CORS - locked to Vercel origin
-var vercelOrigin = Environment.GetEnvironmentVariable("VERCEL_ORIGIN") ?? "http://localhost:3000";
+// CORS
 var allowedOrigins = new[]
 {
-    vercelOrigin,
+    "http://localhost:3000",
     "http://localhost:3001",
     "https://oz-frontend.vercel.app",
     "https://oz-storefront.vercel.app"
