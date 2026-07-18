@@ -103,9 +103,12 @@ public class AdminOrdersController : ControllerBase
         if (!string.IsNullOrEmpty(search))
         {
             if (long.TryParse(search, out var searchId))
-                query = query.Where(o => o.Id == searchId || EF.Functions.Like(o.CustomerPhone, $"%{search}%"));
+                query = query.Where(o => o.Id == searchId
+                    || EF.Functions.Like(o.OrderNumber, $"%{search}%")
+                    || EF.Functions.Like(o.CustomerPhone, $"%{search}%"));
             else
-                query = query.Where(o => EF.Functions.Like(o.CustomerPhone, $"%{search}%"));
+                query = query.Where(o => EF.Functions.Like(o.OrderNumber, $"%{search}%")
+                    || EF.Functions.Like(o.CustomerPhone, $"%{search}%"));
         }
 
         var total = await query.CountAsync();
