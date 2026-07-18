@@ -110,7 +110,7 @@ public class AdminOrdersController : ControllerBase
 
         var total = await query.CountAsync();
 
-        var items = await query
+        var raw = await query
             .OrderByDescending(o => o.CreatedAt)
             .Skip((page - 1) * page_size)
             .Take(page_size)
@@ -122,11 +122,27 @@ public class AdminOrdersController : ControllerBase
                 channel = OrderHelpers.ChannelToString(o.Channel),
                 customerName = o.CustomerName,
                 customerPhone = o.CustomerPhone,
+                pickupDuration = o.PickupDuration,
                 total = o.Total,
                 createdAt = o.CreatedAt,
                 stateChangedAt = o.StateChangedAt
             })
             .ToListAsync();
+
+        var items = raw.Select(o => new
+        {
+            o.id,
+            o.orderNumber,
+            o.state,
+            o.channel,
+            o.customerName,
+            o.customerPhone,
+            o.pickupDuration,
+            pickupDurationLabel = OrderHelpers.PickupDurationLabel(o.pickupDuration),
+            o.total,
+            o.createdAt,
+            o.stateChangedAt
+        }).ToList();
 
         return Ok(new { items, total, page, page_size });
     }
