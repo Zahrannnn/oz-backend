@@ -25,6 +25,14 @@ public static class OrderHelpers
     {
         OrderChannel.Delivery => "delivery",
         OrderChannel.Pickup => "pickup",
-        _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
+        _ => "delivery"
+    };
+
+    public static string? PickupDurationLabel(string? duration) => duration switch
+    {
+        "today" => "اليوم",
+        "tomorrow" => "بكرة",
+        "day_after_tomorrow" => "بعد بكرة",
+        _ => null
     };
 }

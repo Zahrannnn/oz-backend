@@ -31,6 +31,9 @@ public class OrderStatusResponse
     [JsonPropertyName("pickupDuration")]
     public string? PickupDuration { get; set; }
 
+    [JsonPropertyName("pickupDurationLabel")]
+    public string? PickupDurationLabel { get; set; }
+
     [JsonPropertyName("timeline")]
     public List<TimelineEntry> Timeline { get; set; } = [];
 
