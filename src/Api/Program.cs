@@ -61,7 +61,7 @@ var allowedOrigins = new[]
     "http://localhost:3000",
     "http://localhost:3001",
     "https://oz-frontend.vercel.app",
-    "https://oz-storefront.vercel.app"
+    "https://oz-uniform.vercel.app"
 };
 builder.Services.AddCors(options =>
 {
