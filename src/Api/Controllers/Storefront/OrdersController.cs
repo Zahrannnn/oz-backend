@@ -190,7 +190,7 @@ public class OrdersController : ControllerBase
             Total = total,
             State = "placed",
             PickupDuration = order.PickupDuration,
-            PickupDurationLabel = OrderHelpers.PickupDurationLabel(order.PickupDuration)
+            PickupDurationLabel = OrderHelpers.PickupDurationLabel(order.PickupDuration, order.CreatedAt)
         });
     }
 
@@ -268,7 +268,7 @@ public class OrdersController : ControllerBase
             CreatedAt = order.CreatedAt,
             BostaTrackingId = order.BostaTrackingId,
             PickupDuration = order.PickupDuration,
-            PickupDurationLabel = OrderHelpers.PickupDurationLabel(order.PickupDuration),
+            PickupDurationLabel = OrderHelpers.PickupDurationLabel(order.PickupDuration, order.CreatedAt),
 
             Timeline = timeline,
             Items = order.Items.Select(i => new OrderItemStatus
@@ -330,7 +330,7 @@ public class OrdersController : ControllerBase
                 stateLabel,
                 channel = o.Channel == OrderChannel.Delivery ? "delivery" : "pickup",
                 pickupDuration = o.PickupDuration,
-                pickupDurationLabel = OrderHelpers.PickupDurationLabel(o.PickupDuration),
+                pickupDurationLabel = OrderHelpers.PickupDurationLabel(o.PickupDuration, o.CreatedAt),
                 total = o.Total,
                 createdAt = o.CreatedAt,
                 bostaTrackingId = o.BostaTrackingId,

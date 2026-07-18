@@ -141,7 +141,7 @@ public class AdminOrdersController : ControllerBase
             o.customerName,
             o.customerPhone,
             o.pickupDuration,
-            pickupDurationLabel = OrderHelpers.PickupDurationLabel(o.pickupDuration),
+            pickupDurationLabel = OrderHelpers.PickupDurationLabel(o.pickupDuration, o.createdAt),
             o.total,
             o.createdAt,
             o.stateChangedAt
@@ -285,7 +285,7 @@ public class AdminOrdersController : ControllerBase
             ["state"] = OrderHelpers.StateToString(order.State),
             ["channel"] = OrderHelpers.ChannelToString(order.Channel),
             ["pickupDuration"] = order.PickupDuration,
-            ["pickupDurationLabel"] = OrderHelpers.PickupDurationLabel(order.PickupDuration),
+            ["pickupDurationLabel"] = OrderHelpers.PickupDurationLabel(order.PickupDuration, order.CreatedAt),
             ["customerName"] = order.CustomerName,
             ["customerPhone"] = order.CustomerPhone,
             ["customerEmail"] = order.CustomerEmail,

@@ -28,11 +28,29 @@ public static class OrderHelpers
         _ => "delivery"
     };
 
-    public static string? PickupDurationLabel(string? duration) => duration switch
+    public static string? PickupDurationLabel(string? duration, DateTime createdAt)
     {
-        "today" => "اليوم",
-        "tomorrow" => "بكرة",
-        "day_after_tomorrow" => "بعد بكرة",
-        _ => null
-    };
+        if (string.IsNullOrEmpty(duration)) return null;
+        var offset = duration switch
+        {
+            "today" => 0,
+            "tomorrow" => 1,
+            "day_after_tomorrow" => 2,
+            _ => -1
+        };
+        if (offset < 0) return null;
+
+        var pickupDate = createdAt.Date.AddDays(offset);
+        var today = DateTime.UtcNow.Date;
+        var diff = (pickupDate - today).Days;
+
+        return diff switch
+        {
+            < 0 => "فات الموعد",
+            0 => "اليوم",
+            1 => "بكرة",
+            2 => "بعد بكرة",
+            _ => duration
+        };
+    }
 }
