@@ -28,6 +28,9 @@ public class OrderStatusResponse
     [JsonPropertyName("bostaTrackingId")]
     public string? BostaTrackingId { get; set; }
 
+    [JsonPropertyName("pickupDuration")]
+    public string? PickupDuration { get; set; }
+
     [JsonPropertyName("timeline")]
     public List<TimelineEntry> Timeline { get; set; } = [];
 

@@ -265,6 +265,7 @@ public class AdminOrdersController : ControllerBase
             ["orderNumber"] = order.OrderNumber,
             ["state"] = OrderHelpers.StateToString(order.State),
             ["channel"] = OrderHelpers.ChannelToString(order.Channel),
+            ["pickupDuration"] = order.PickupDuration,
             ["customerName"] = order.CustomerName,
             ["customerPhone"] = order.CustomerPhone,
             ["customerEmail"] = order.CustomerEmail,

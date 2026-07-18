@@ -21,4 +21,7 @@ public class PlaceOrderResponse
 
     [JsonPropertyName("state")]
     public string State { get; set; } = string.Empty;
+
+    [JsonPropertyName("pickupDuration")]
+    public string? PickupDuration { get; set; }
 }

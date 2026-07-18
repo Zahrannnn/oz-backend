@@ -28,6 +28,7 @@ public class Order
     public string OrderNumber { get; set; } = string.Empty;
     public string? TrackingToken { get; set; }
     public byte[] TrackingTokenHash { get; set; } = null!;
+    public string? PickupDuration { get; set; }
     public OrderState State { get; set; }
     public OrderChannel Channel { get; set; }
     public string CustomerName { get; set; } = string.Empty;

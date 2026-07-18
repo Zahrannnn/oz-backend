@@ -212,6 +212,7 @@ public class AppDbContext : DbContext
             e.Property(x => x.OrderNumber).HasColumnName("order_number").HasMaxLength(20).IsRequired().HasColumnType("varchar(20)");
             e.Property(x => x.TrackingToken).HasColumnName("tracking_token").HasMaxLength(64).HasColumnType("varchar(64)");
             e.Property(x => x.TrackingTokenHash).HasColumnName("tracking_token_hash").HasColumnType("binary(32)").IsRequired();
+            e.Property(x => x.PickupDuration).HasColumnName("pickup_duration").HasMaxLength(20).HasColumnType("varchar(20)");
             e.Property(x => x.State).HasColumnName("state").HasColumnType("tinyint").IsRequired();
             e.Property(x => x.Channel).HasColumnName("channel").HasColumnType("tinyint").IsRequired();
             e.Property(x => x.CustomerName).HasColumnName("customer_name").HasMaxLength(200).IsRequired().HasColumnType("nvarchar(200)");

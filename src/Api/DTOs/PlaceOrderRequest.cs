@@ -22,6 +22,9 @@ public class PlaceOrderRequest
     [JsonPropertyName("address")]
     public string? Address { get; set; }
 
+    [JsonPropertyName("pickupDuration")]
+    public string? PickupDuration { get; set; }
+
     [JsonPropertyName("items")]
     public List<OrderItemRequest> Items { get; set; } = [];
 

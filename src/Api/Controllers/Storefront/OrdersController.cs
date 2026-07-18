@@ -30,20 +30,32 @@ public class OrdersController : ControllerBase
     {
         var channelStr = request.ResolvedChannel;
         if (channelStr != "delivery" && channelStr != "pickup")
-            return UnprocessableEntity(new { detail = "Channel must be 'delivery' or 'pickup'" });
+            return UnprocessableEntity(new { error = "channel_invalid", detail = "القناة يجب أن تكون delivery أو pickup" });
 
         var channel = channelStr == "delivery" ? OrderChannel.Delivery : OrderChannel.Pickup;
         var (customerName, customerPhone, customerEmail, addressLine) = request.ResolveCustomer();
 
         var items = request.Items;
         if (items.Count == 0)
-            return UnprocessableEntity(new { detail = "At least one item required" });
+            return UnprocessableEntity(new { error = "items_required", detail = "مطلوب منتج واحد على الأقل" });
 
         if (string.IsNullOrWhiteSpace(customerName))
-            return UnprocessableEntity(new { detail = "Customer name is required" });
+            return UnprocessableEntity(new { error = "name_required", detail = "الاسم مطلوب" });
 
         if (string.IsNullOrWhiteSpace(customerPhone))
-            return UnprocessableEntity(new { detail = "Phone is required" });
+            return UnprocessableEntity(new { error = "phone_required", detail = "رقم التليفون مطلوب" });
+
+        if (string.IsNullOrWhiteSpace(customerEmail))
+            return UnprocessableEntity(new { error = "email_required", detail = "البريد الإلكتروني مطلوب" });
+
+        if (channel == OrderChannel.Pickup)
+        {
+            var dur = request.PickupDuration;
+            if (string.IsNullOrWhiteSpace(dur))
+                return UnprocessableEntity(new { error = "pickup_duration_req", detail = "مدة الاستلام مطلوبة لطلبات الاستلام" });
+            if (dur != "today" && dur != "tomorrow" && dur != "day_after_tomorrow")
+                return UnprocessableEntity(new { error = "pickup_duration_inv", detail = "مدة الاستلام غير صحيحة (today / tomorrow / day_after_tomorrow)" });
+        }
 
         await using var tx = await _db.Database.BeginTransactionAsync();
 
@@ -107,6 +119,7 @@ public class OrdersController : ControllerBase
             CustomerName = customerName,
             CustomerPhone = customerPhone,
             CustomerEmail = customerEmail,
+            PickupDuration = channel == OrderChannel.Pickup ? request.PickupDuration : null,
             AddressCity = addressLine,
             AddressLine = channel == OrderChannel.Delivery ? addressLine : null,
             DeliveryFee = deliveryFee,
@@ -166,8 +179,7 @@ public class OrdersController : ControllerBase
         </body>
         </html>
         """;
-        if (!string.IsNullOrWhiteSpace(order.CustomerEmail))
-            _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{orderNumber} تم", confirmationHtml));
+        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{orderNumber} تم", confirmationHtml));
 
         return CreatedAtAction(null, null, new PlaceOrderResponse
         {
@@ -176,7 +188,8 @@ public class OrdersController : ControllerBase
             Token = token,
             TrackingUrl = trackingUrl,
             Total = total,
-            State = "placed"
+            State = "placed",
+            PickupDuration = order.PickupDuration
         });
     }
 
@@ -253,6 +266,7 @@ public class OrdersController : ControllerBase
             Total = order.Total,
             CreatedAt = order.CreatedAt,
             BostaTrackingId = order.BostaTrackingId,
+            PickupDuration = order.PickupDuration,
             Timeline = timeline,
             Items = order.Items.Select(i => new OrderItemStatus
             {
@@ -312,6 +326,7 @@ public class OrdersController : ControllerBase
                 state = OrderHelpers.StateToString(o.State),
                 stateLabel,
                 channel = o.Channel == OrderChannel.Delivery ? "delivery" : "pickup",
+                pickupDuration = o.PickupDuration,
                 total = o.Total,
                 createdAt = o.CreatedAt,
                 bostaTrackingId = o.BostaTrackingId,
