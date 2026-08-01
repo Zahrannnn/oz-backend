@@ -28,8 +28,7 @@ public class AdminInitializer : IHostedService
             {
                 Id = Guid.NewGuid(),
                 Email = "admin@oz.com",
-                PasswordHash = hash,
-                PasswordSalt = ""
+                PasswordHash = hash
             });
             await db.SaveChangesAsync(cancellationToken);
             Console.WriteLine("[AdminInitializer] Default admin created: admin@oz.com / admin123");

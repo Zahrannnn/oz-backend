@@ -3,9 +3,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Oz.Api.DTOs;
 using Oz.Api.Services;
 using Oz.Domain.Entities;
-using Oz.Domain.Repositories;
 using Oz.Infrastructure.Data;
 
 namespace Oz.Api.Controllers.Admin;
@@ -16,13 +16,11 @@ namespace Oz.Api.Controllers.Admin;
 [Route("api/v1/admin/grade-stages")]
 public class GradeStagesController : ControllerBase
 {
-    private readonly IRepository<GradeStage> _repository;
     private readonly AppDbContext _db;
     private readonly AuditLogService _auditLog;
 
-    public GradeStagesController(IRepository<GradeStage> repository, AppDbContext db, AuditLogService auditLog)
+    public GradeStagesController(AppDbContext db, AuditLogService auditLog)
     {
-        _repository = repository;
         _db = db;
         _auditLog = auditLog;
     }
@@ -38,7 +36,8 @@ public class GradeStagesController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        await _repository.AddAsync(gradeStage, ct);
+        _db.GradeStages.Add(gradeStage);
+        await _db.SaveChangesAsync(ct);
 
         var actorId = GetActorId();
         await _auditLog.WriteAsync(actorId, "grade_stage.create", "grade_stage", gradeStage.Id.ToString(),
@@ -70,7 +69,7 @@ public class GradeStagesController : ControllerBase
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id, CancellationToken ct)
     {
-        var gradeStage = await _repository.GetByIdAsync(id, ct);
+        var gradeStage = await _db.GradeStages.FindAsync(new object[] { id }, ct);
         if (gradeStage is null) return NotFound();
         var dto = new GradeStageDto(gradeStage.Id, gradeStage.SchoolId, gradeStage.Name, gradeStage.DisplayOrder, gradeStage.CreatedAt);
         return Ok(dto);
@@ -129,4 +128,3 @@ public class GradeStagesController : ControllerBase
 
 public record CreateGradeStageDto(long SchoolId, string Name, int DisplayOrder);
 public record UpdateGradeStageDto(long SchoolId, string Name, int DisplayOrder);
-public record GradeStageDto(long Id, long SchoolId, string Name, int DisplayOrder, DateTime CreatedAt);

@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,8 +19,6 @@ public class ReportsController : ControllerBase
     {
         _db = db;
     }
-
-    private Guid GetActorId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet("sales")]
     public async Task<IActionResult> GetSalesReport(

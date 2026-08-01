@@ -5,7 +5,7 @@ using Oz.Infrastructure.Data;
 
 namespace Oz.Api.Services;
 
-public class SmtpEmailService : IEmailService
+public class SmtpEmailService
 {
     private readonly string? _host;
     private readonly int _port;

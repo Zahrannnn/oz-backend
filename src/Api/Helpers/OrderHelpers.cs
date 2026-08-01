@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Oz.Domain.Entities;
 
 namespace Oz.Api.Helpers;
@@ -27,6 +28,39 @@ public static class OrderHelpers
         OrderChannel.Pickup => "pickup",
         _ => "delivery"
     };
+
+    public static string StateLabel(OrderState state) => state switch
+    {
+        OrderState.Placed => "تم الطلب",
+        OrderState.ReadyToShip => "جاهز للشحن",
+        OrderState.HandedToCourier => "سُلم للمندوب",
+        OrderState.InTransit => "في الطريق",
+        OrderState.Delivered => "تم التسليم",
+        OrderState.CodFailed => "فشل التحصيل",
+        OrderState.ReturnedToStore => "مرتجع للمتجر",
+        OrderState.ReadyForPickup => "جاهز للاستلام",
+        OrderState.PickedUp => "تم الاستلام",
+        OrderState.ClosedSuccess => "مكتمل",
+        OrderState.ClosedFailed => "مغلق",
+        OrderState.Cancelled => "ملغى",
+        _ => StateToString(state)
+    };
+
+    public static byte[]? TokenToHash(string token)
+    {
+        var normalized = token.Replace('-', '+').Replace('_', '/');
+        var padding = (4 - normalized.Length % 4) % 4;
+        normalized += new string('=', padding);
+
+        try
+        {
+            return SHA256.HashData(Convert.FromBase64String(normalized));
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
 
     public static string? PickupDurationLabel(string? duration, DateTime createdAt)
     {

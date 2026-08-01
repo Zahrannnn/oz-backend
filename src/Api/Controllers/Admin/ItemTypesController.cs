@@ -2,9 +2,9 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Oz.Api.Services;
 using Oz.Domain.Entities;
-using Oz.Domain.Repositories;
 using Oz.Infrastructure.Data;
 
 namespace Oz.Api.Controllers.Admin;
@@ -15,13 +15,11 @@ namespace Oz.Api.Controllers.Admin;
 [Route("api/v1/admin/item-types")]
 public class ItemTypesController : ControllerBase
 {
-    private readonly IRepository<ItemType> _repository;
     private readonly AppDbContext _db;
     private readonly AuditLogService _auditLog;
 
-    public ItemTypesController(IRepository<ItemType> repository, AppDbContext db, AuditLogService auditLog)
+    public ItemTypesController(AppDbContext db, AuditLogService auditLog)
     {
-        _repository = repository;
         _db = db;
         _auditLog = auditLog;
     }
@@ -35,7 +33,8 @@ public class ItemTypesController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        await _repository.AddAsync(itemType, ct);
+        _db.ItemTypes.Add(itemType);
+        await _db.SaveChangesAsync(ct);
 
         var actorId = GetActorId();
         await _auditLog.WriteAsync(actorId, "item_type.create", "item_type", itemType.Id.ToString(),
@@ -48,15 +47,19 @@ public class ItemTypesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] int page = 1, [FromQuery] int page_size = 20, CancellationToken ct = default)
     {
-        var result = await _repository.ListAsync(page, page_size, ct);
-        var dtos = result.Items.Select(it => new ItemTypeDto(it.Id, it.Name, it.CreatedAt)).ToList();
-        return Ok(new { items = dtos, result.Total, result.Page, result.PageSize });
+        var total = await _db.ItemTypes.CountAsync(ct);
+        var items = await _db.ItemTypes
+            .Skip((page - 1) * page_size)
+            .Take(page_size)
+            .ToListAsync(ct);
+        var dtos = items.Select(it => new ItemTypeDto(it.Id, it.Name, it.CreatedAt)).ToList();
+        return Ok(new { items = dtos, total, page, page_size });
     }
 
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id, CancellationToken ct)
     {
-        var itemType = await _repository.GetByIdAsync(id, ct);
+        var itemType = await _db.ItemTypes.FindAsync(new object[] { id }, ct);
         if (itemType is null) return NotFound();
         var dto = new ItemTypeDto(itemType.Id, itemType.Name, itemType.CreatedAt);
         return Ok(dto);

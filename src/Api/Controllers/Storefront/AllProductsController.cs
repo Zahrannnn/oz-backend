@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Oz.Api.DTOs;
+using Oz.Api.Helpers;
 using Oz.Domain.Entities;
 using Oz.Infrastructure.Data;
 
@@ -64,31 +64,9 @@ public class AllProductsController : ControllerBase
             .Take(pageSize)
             .ToListAsync(ct);
 
-        var items = products.Select(MapCard).ToList();
+        var items = products.Select(ProductCardMapper.Map).ToList();
         var hasNext = (page * pageSize) < total;
 
         return Ok(new { items, total, page, page_size = pageSize, has_next = hasNext });
-    }
-
-    private static ProductCardDto MapCard(Product p)
-    {
-        var variants = p.Variants.OrderBy(v => v.Id).ToList();
-        var priceFrom = variants.Count != 0 ? variants.Min(v => (decimal?)v.PriceInclVat) : null;
-        var thumbnailUrl = p.Images.OrderBy(i => i.SortOrder).FirstOrDefault()?.Url;
-        var stockStatus = ComputeStockStatus(variants);
-        var variantDtos = variants
-            .Select(v => new VariantSummaryDto(v.Id, v.SizeLabel, v.PriceInclVat, v.Stock))
-            .ToList();
-        return new ProductCardDto(p.Id, p.ItemType.Name, (byte)p.Gender, p.Color, p.IsInSet,
-            priceFrom, thumbnailUrl, stockStatus, variantDtos);
-    }
-
-    private static string ComputeStockStatus(List<Variant> variants)
-    {
-        if (variants.Count == 0 || variants.All(v => v.Stock == 0))
-            return "out_of_stock";
-        if (variants.Any(v => v.Stock <= v.LowStockThreshold))
-            return "low_stock";
-        return "in_stock";
     }
 }

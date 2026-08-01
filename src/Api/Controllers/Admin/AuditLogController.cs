@@ -36,12 +36,7 @@ public class AuditLogController : ControllerBase
         page = Math.Max(1, page);
         page_size = Math.Clamp(page_size, 1, 100);
 
-        var query = _db.AuditLogs.AsQueryable();
-        if (actor.HasValue) query = query.Where(a => a.ActorId == actor.Value);
-        if (!string.IsNullOrEmpty(action)) query = query.Where(a => a.Action == action);
-        if (from.HasValue) query = query.Where(a => a.CreatedAt >= from.Value);
-        if (to.HasValue) query = query.Where(a => a.CreatedAt <= to.Value);
-        if (!string.IsNullOrEmpty(entity_type)) query = query.Where(a => a.EntityType == entity_type);
+        var query = ApplyFilters(actor, action, from, to, entity_type);
 
         var total = await query.CountAsync();
         var items = await query
@@ -66,12 +61,7 @@ public class AuditLogController : ControllerBase
         [FromQuery] DateTime? to = null,
         [FromQuery] string? entity_type = null)
     {
-        var query = _db.AuditLogs.AsQueryable();
-        if (actor.HasValue) query = query.Where(a => a.ActorId == actor.Value);
-        if (!string.IsNullOrEmpty(action)) query = query.Where(a => a.Action == action);
-        if (from.HasValue) query = query.Where(a => a.CreatedAt >= from.Value);
-        if (to.HasValue) query = query.Where(a => a.CreatedAt <= to.Value);
-        if (!string.IsNullOrEmpty(entity_type)) query = query.Where(a => a.EntityType == entity_type);
+        var query = ApplyFilters(actor, action, from, to, entity_type);
 
         var logs = await query
             .OrderByDescending(a => a.CreatedAt)
@@ -86,6 +76,17 @@ public class AuditLogController : ControllerBase
         }
 
         return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "audit-log-export.csv");
+    }
+
+    private IQueryable<AuditLog> ApplyFilters(Guid? actor, string? action, DateTime? from, DateTime? to, string? entityType)
+    {
+        var query = _db.AuditLogs.AsQueryable();
+        if (actor.HasValue) query = query.Where(a => a.ActorId == actor.Value);
+        if (!string.IsNullOrEmpty(action)) query = query.Where(a => a.Action == action);
+        if (from.HasValue) query = query.Where(a => a.CreatedAt >= from.Value);
+        if (to.HasValue) query = query.Where(a => a.CreatedAt <= to.Value);
+        if (!string.IsNullOrEmpty(entityType)) query = query.Where(a => a.EntityType == entityType);
+        return query;
     }
 
     private static string EscapeCsv(string value)

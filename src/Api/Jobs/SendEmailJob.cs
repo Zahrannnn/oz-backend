@@ -4,9 +4,9 @@ namespace Oz.Api.Jobs;
 
 public class SendEmailJob
 {
-    private readonly IEmailService _email;
+    private readonly SmtpEmailService _email;
 
-    public SendEmailJob(IEmailService email)
+    public SendEmailJob(SmtpEmailService email)
     {
         _email = email;
     }

@@ -9,7 +9,15 @@ public class PlaceOrderRequestValidator : AbstractValidator<PlaceOrderRequest>
 
     public PlaceOrderRequestValidator()
     {
-        // --- flat or nested email — top level always fires ---
+        // --- flat or nested customer — top level fires when no nested object ---
+        RuleFor(x => x.CustomerName)
+            .NotEmpty().WithMessage("name_required|الاسم مطلوب")
+            .When(x => x.Customer == null);
+
+        RuleFor(x => x.Phone)
+            .NotEmpty().WithMessage("phone_required|رقم التليفون مطلوب")
+            .When(x => x.Customer == null);
+
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("email_required|البريد الإلكتروني مطلوب")
             .EmailAddress().WithMessage("email_invalid|البريد الإلكتروني غير صحيح")

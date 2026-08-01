@@ -28,34 +28,9 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> PlaceOrder([FromBody] PlaceOrderRequest request)
     {
-        var channelStr = request.ResolvedChannel;
-        if (channelStr != "delivery" && channelStr != "pickup")
-            return UnprocessableEntity(new { error = "channel_invalid", detail = "القناة يجب أن تكون delivery أو pickup" });
-
-        var channel = channelStr == "delivery" ? OrderChannel.Delivery : OrderChannel.Pickup;
+        var channel = request.ResolvedChannel == "delivery" ? OrderChannel.Delivery : OrderChannel.Pickup;
         var (customerName, customerPhone, customerEmail, addressLine) = request.ResolveCustomer();
-
         var items = request.Items;
-        if (items.Count == 0)
-            return UnprocessableEntity(new { error = "items_required", detail = "مطلوب منتج واحد على الأقل" });
-
-        if (string.IsNullOrWhiteSpace(customerName))
-            return UnprocessableEntity(new { error = "name_required", detail = "الاسم مطلوب" });
-
-        if (string.IsNullOrWhiteSpace(customerPhone))
-            return UnprocessableEntity(new { error = "phone_required", detail = "رقم التليفون مطلوب" });
-
-        if (string.IsNullOrWhiteSpace(customerEmail))
-            return UnprocessableEntity(new { error = "email_required", detail = "البريد الإلكتروني مطلوب" });
-
-        if (channel == OrderChannel.Pickup)
-        {
-            var dur = request.PickupDuration;
-            if (string.IsNullOrWhiteSpace(dur))
-                return UnprocessableEntity(new { error = "pickup_duration_req", detail = "مدة الاستلام مطلوبة لطلبات الاستلام" });
-            if (dur != "today" && dur != "tomorrow" && dur != "day_after_tomorrow")
-                return UnprocessableEntity(new { error = "pickup_duration_inv", detail = "مدة الاستلام غير صحيحة (today / tomorrow / day_after_tomorrow)" });
-        }
 
         await using var tx = await _db.Database.BeginTransactionAsync();
 
@@ -100,12 +75,11 @@ public class OrdersController : ControllerBase
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
         var tokenHash = SHA256.HashData(tokenBytes);
 
-        var deliveryFee = 0m;
         var total = items.Sum(i =>
         {
             var v = variantMap[i.VariantId];
             return v.PriceInclVat * i.Qty;
-        }) + deliveryFee;
+        });
 
         var orderNumber = $"OZ-{Convert.ToHexString(RandomNumberGenerator.GetBytes(8))}";
 
@@ -122,7 +96,6 @@ public class OrdersController : ControllerBase
             PickupDuration = channel == OrderChannel.Pickup ? request.PickupDuration : null,
             AddressCity = addressLine,
             AddressLine = channel == OrderChannel.Delivery ? addressLine : null,
-            DeliveryFee = deliveryFee,
             Total = total,
             StateChangedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
@@ -197,15 +170,9 @@ public class OrdersController : ControllerBase
     [HttpGet("by-token/{token}")]
     public async Task<IActionResult> GetOrderByToken(string token)
     {
-        var normalizedToken = token.Replace('-', '+').Replace('_', '/');
-        var padding = (4 - normalizedToken.Length % 4) % 4;
-        normalizedToken += new string('=', padding);
-
-        byte[] tokenBytes;
-        try { tokenBytes = Convert.FromBase64String(normalizedToken); }
-        catch { return NotFound(); }
-
-        var tokenHash = SHA256.HashData(tokenBytes);
+        var tokenHash = OrderHelpers.TokenToHash(token);
+        if (tokenHash == null)
+            return NotFound();
 
         var order = await _db.Orders
             .Include(o => o.Items)
@@ -231,22 +198,7 @@ public class OrdersController : ControllerBase
             At = a.CreatedAt
         }).ToList();
 
-        var stateLabel = order.State switch
-        {
-            OrderState.Placed => "تم الطلب",
-            OrderState.ReadyToShip => "جاهز للشحن",
-            OrderState.HandedToCourier => "سُلم للمندوب",
-            OrderState.InTransit => "في الطريق",
-            OrderState.Delivered => "تم التسليم",
-            OrderState.CodFailed => "فشل التحصيل",
-            OrderState.ReturnedToStore => "مرتجع للمتجر",
-            OrderState.ReadyForPickup => "جاهز للاستلام",
-            OrderState.PickedUp => "تم الاستلام",
-            OrderState.ClosedSuccess => "مكتمل",
-            OrderState.ClosedFailed => "مغلق",
-            OrderState.Cancelled => "ملغى",
-            _ => OrderHelpers.StateToString(order.State)
-        };
+        var stateLabel = OrderHelpers.StateLabel(order.State);
 
         if (timeline.Count == 0)
         {
@@ -304,22 +256,7 @@ public class OrdersController : ControllerBase
 
         var result = orders.Select(o =>
         {
-            var stateLabel = o.State switch
-            {
-                OrderState.Placed => "تم الطلب",
-                OrderState.ReadyToShip => "جاهز للشحن",
-                OrderState.HandedToCourier => "سُلم للمندوب",
-                OrderState.InTransit => "في الطريق",
-                OrderState.Delivered => "تم التسليم",
-                OrderState.CodFailed => "فشل التحصيل",
-                OrderState.ReturnedToStore => "مرتجع للمتجر",
-                OrderState.ReadyForPickup => "جاهز للاستلام",
-                OrderState.PickedUp => "تم الاستلام",
-                OrderState.ClosedSuccess => "مكتمل",
-                OrderState.ClosedFailed => "مغلق",
-                OrderState.Cancelled => "ملغى",
-                _ => OrderHelpers.StateToString(o.State)
-            };
+            var stateLabel = OrderHelpers.StateLabel(o.State);
 
             return new
             {
@@ -352,15 +289,9 @@ public class OrdersController : ControllerBase
     [HttpPost("by-token/{token}/cancel")]
     public async Task<IActionResult> CancelOrderByToken(string token, [FromBody] CancelOrderRequest request)
     {
-        var normalizedToken = token.Replace('-', '+').Replace('_', '/');
-        var padding = (4 - normalizedToken.Length % 4) % 4;
-        normalizedToken += new string('=', padding);
-
-        byte[] tokenBytes;
-        try { tokenBytes = Convert.FromBase64String(normalizedToken); }
-        catch { return NotFound(); }
-
-        var tokenHash = SHA256.HashData(tokenBytes);
+        var tokenHash = OrderHelpers.TokenToHash(token);
+        if (tokenHash == null)
+            return NotFound();
 
         var order = await _db.Orders
             .Include(o => o.Items)
@@ -413,46 +344,13 @@ public class OrdersController : ControllerBase
             : $"{Request.Scheme}://{Request.Host}/orders/{token}";
 
         var reasonText = string.IsNullOrWhiteSpace(request.Reason) ? "طلب من العميل" : request.Reason;
-        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} ملغي", $"""
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>تم إلغاء الطلب</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&family=Work+Sans:wght@400;600&display=swap" rel="stylesheet">
-        </head>
-        <body style="margin:0;padding:24px 16px;background-color:#fff8f0;font-family:'Work Sans',sans-serif;direction:rtl;text-align:right;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;margin:0 auto;background-color:#ffffff;border:3px solid #1f1b10;border-radius:16px;box-shadow:6px 6px 0 #1f1b10;">
-        <tr>
-        <td style="padding:32px 24px 0;">
-        <p style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;color:#725c00;margin:0 0 8px;">&#10060; طلب ملغي</p>
-        <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:32px;font-weight:800;line-height:40px;letter-spacing:-0.01em;color:#1f1b10;margin:0 0 16px;">تم إلغاء الطلب</h1>
-        <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 24px;">طلبك <strong>#{order.OrderNumber}</strong> اتعمل إلغاء.</p>
-        <p style="font-size:14px;line-height:20px;color:#7f765f;margin:0 0 24px;">السبب: {reasonText}</p>
-        </td>
-        </tr>
-        <tr>
-        <td style="padding:0 24px 32px;text-align:center;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
-        <tr>
-        <td style="border-radius:8px;border:3px solid #1f1b10;box-shadow:6px 6px 0 #1f1b10;background-color:#ffd200;text-align:center;padding:0;">
-        <a href="{trackingUrl}" style="display:block;padding:14px 24px;font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;font-weight:700;line-height:24px;color:#1f1b10;text-decoration:none;">&#128065; تتبع الطلب</a>
-        </td>
-        </tr>
-        </table>
-        </td>
-        </tr>
-        <tr>
-        <td style="padding:0 24px 32px;text-align:center;">
-        <p style="font-size:11px;line-height:16px;color:#7f765f;margin:0;">Oz School Uniforms</p>
-        </td>
-        </tr>
-        </table>
-        </body>
-        </html>
-        """));
+        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} ملغي", EmailTemplates.Wrap(
+            "تم إلغاء الطلب", "&#10060; طلب ملغي",
+            $"""
+            <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 24px;">طلبك <strong>#{order.OrderNumber}</strong> اتعمل إلغاء.</p>
+            <p style="font-size:14px;line-height:20px;color:#7f765f;margin:0 0 24px;">السبب: {reasonText}</p>
+            """,
+            "&#128065; تتبع الطلب", trackingUrl)));
 
         return Ok(new { state = "cancelled" });
     }

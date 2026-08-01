@@ -10,8 +10,6 @@ public enum EmailStatus : byte
 public class EmailLog
 {
     public long Id { get; set; }
-    public long? OrderId { get; set; }
-    public long? VariantId { get; set; }
     public string Recipient { get; set; } = string.Empty;
     public string Template { get; set; } = string.Empty;
     public EmailStatus Status { get; set; }

@@ -29,10 +29,10 @@ public class AutoCancelOrdersJob
                         && o.StateChangedAt < now.AddDays(-5))
             .ToListAsync();
 
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
         foreach (var order in staleOrders)
         {
-            await using var tx = await _db.Database.BeginTransactionAsync();
-
             order.State = OrderState.Cancelled;
             order.CancelledAt = now;
             order.StateChangedAt = now;
@@ -52,9 +52,6 @@ public class AutoCancelOrdersJob
                 CreatedAt = now
             });
 
-            await _db.SaveChangesAsync();
-            await tx.CommitAsync();
-
             _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"Order #{order.Id} Cancelled", $"""
             <!DOCTYPE html>
             <html>
@@ -68,5 +65,8 @@ public class AutoCancelOrdersJob
             </html>
             """));
         }
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
     }
 }

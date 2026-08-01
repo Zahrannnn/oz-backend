@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.FileProviders;
@@ -9,8 +11,6 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
 using Oz.Infrastructure.Data;
-using Oz.Infrastructure.Repositories;
-using Oz.Domain.Repositories;
 using Oz.Api.Filters;
 using Oz.Api.Middleware;
 using Oz.Api.Jobs;
@@ -123,19 +123,52 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Rate limiting (per IP + path, same limits as old middleware)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, ct) =>
+    {
+        var retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfterValue) ? (int)retryAfterValue.TotalSeconds : 1;
+        context.HttpContext.Response.Headers.RetryAfter = retryAfter.ToString();
+        context.HttpContext.Response.ContentType = "application/problem+json";
+        await context.HttpContext.Response.WriteAsync(JsonSerializer.Serialize(new
+        {
+            type = "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+            title = "Too Many Requests",
+            status = 429,
+            detail = $"Rate limit exceeded. Retry after {retryAfter} seconds."
+        }), ct);
+    };
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
+    {
+        var ip = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var path = http.Request.Path.Value?.ToLowerInvariant() ?? "";
+        var key = $"{ip}:{path}";
+
+        FixedWindowRateLimiterOptions limits;
+        if (path.StartsWith("/api/v1/admin/"))
+            limits = new() { AutoReplenishment = true, PermitLimit = 30, Window = TimeSpan.FromSeconds(60) };
+        else if (path == "/api/v1/orders" && http.Request.Method == "POST")
+            limits = new() { AutoReplenishment = true, PermitLimit = 5, Window = TimeSpan.FromSeconds(1) };
+        else if (path.StartsWith("/api/v1/"))
+            limits = new() { AutoReplenishment = true, PermitLimit = 60, Window = TimeSpan.FromSeconds(60) };
+        else
+            return RateLimitPartition.GetNoLimiter(key);
+
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => limits);
+    });
+});
+
 // Application services
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AuditLogService>();
-builder.Services.AddScoped<IdempotencyService>();
-
-// Generic repository
-builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 // Email service
-builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<SmtpEmailService>();
 
 // Bosta client
-builder.Services.AddHttpClient<IBostaClient, BostaClient>();
+builder.Services.AddHttpClient<BostaClient>();
 
 // Hangfire jobs
 builder.Services.AddScoped<SendEmailJob>();
@@ -153,7 +186,7 @@ EnvironmentValidator.Validate(builder.Configuration, app.Environment,
 // Middleware pipeline
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseSecurityHeaders();
-app.UseMiddleware<RateLimitingMiddleware>();
+app.UseRateLimiter();
 app.UseCors();
 
 // Static files - serve product images from /uploads (content-root relative)
@@ -167,46 +200,6 @@ app.UseStaticFiles(new StaticFileOptions
 
 // OpenAPI spec endpoint (built-in minimal API; controllers not auto-included on .NET 10)
 app.MapOpenApi();
-
-// API route inventory - lists every controller route for discoverability
-app.MapGet("/swagger", (HttpContext ctx) =>
-{
-    var endpoints = ctx.RequestServices
-        .GetRequiredService<EndpointDataSource>()
-        .Endpoints
-        .OfType<RouteEndpoint>()
-        .Select(e =>
-        {
-            var methods = string.Join(",", e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? new[] { "GET" });
-            var pattern = e.RoutePattern.RawText ?? "";
-            var displayName = e.DisplayName ?? "";
-            return new { methods, pattern, displayName };
-        })
-        .Where(x => x.pattern.StartsWith("api/") || x.pattern.StartsWith("hangfire") || x.pattern == "swagger")
-        .OrderBy(x => x.pattern)
-        .ToList();
-
-    var rows = string.Join("", endpoints.Select(e =>
-        $"<tr><td>{e.methods}</td><td><code>{e.pattern}</code></td><td><small>{e.displayName}</small></td></tr>"));
-
-    return Results.Content($$"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head><meta charset="utf-8"><title>Oz Backend - API Routes</title>
-    <style>body{font-family:system-ui;max-width:1100px;margin:30px auto;padding:0 20px;color:#222}
-    h1{margin:0 0 6px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:20px;font-size:14px}
-    th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5}
-    code{background:#f0f0f0;padding:2px 6px;border-radius:3px}
-    .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
-    .GET{background:#dbeafe;color:#1e40af}.POST{background:#dcfce7;color:#166534}
-    .PUT{background:#fef3c7;color:#854d0e}.DELETE{background:#fee2e2;color:#991b1b}</style>
-    </head><body>
-    <h1>Oz Backend — API Routes</h1>
-    <small>{{endpoints.Count}} endpoints. See <code>docs/api/*.md</code> for full reference. Swagger UI requires .NET 10-compatible Swashbuckle (not yet available).</small>
-    <table><tr><th>Method</th><th>Path</th><th>Handler</th></tr>{{rows}}</table>
-    </body></html>
-    """, "text/html; charset=utf-8");
-}).ExcludeFromDescription();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
@@ -222,11 +215,6 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 app.MapControllers();
 
 // Recurring jobs
-RecurringJob.AddOrUpdate(
-    "heartbeat",
-    () => Console.WriteLine($"[Hangfire heartbeat] {DateTime.UtcNow:O}"),
-    Cron.Minutely);
-
 RecurringJob.AddOrUpdate<AutoCancelOrdersJob>(
     "auto-cancel-orders",
     job => job.ExecuteAsync(),

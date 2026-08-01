@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Oz.Api.Services;
 
-public class BostaClient : IBostaClient
+public class BostaClient
 {
     private readonly HttpClient _http;
     private readonly string? _apiKey;

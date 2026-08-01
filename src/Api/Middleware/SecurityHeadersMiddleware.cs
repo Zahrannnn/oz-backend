@@ -17,12 +17,7 @@ public class SecurityHeadersMiddleware
         context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
         context.Response.Headers.TryAdd("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 
-        if (path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase))
-        {
-            context.Response.Headers.TryAdd("Content-Security-Policy",
-                "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self'");
-        }
-        else if (path.StartsWith("/hangfire", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith("/hangfire", StringComparison.OrdinalIgnoreCase))
         {
             context.Response.Headers.TryAdd("Content-Security-Policy",
                 "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");

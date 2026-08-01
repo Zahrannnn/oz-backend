@@ -22,7 +22,6 @@ public class AppDbContext : DbContext
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<Exchange> Exchanges => Set<Exchange>();
-    public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -141,7 +140,6 @@ public class AppDbContext : DbContext
             e.Property(x => x.Id).HasColumnName("id").HasDefaultValueSql("NEWSEQUENTIALID()");
             e.Property(x => x.Email).HasColumnName("email").HasMaxLength(255).IsRequired().HasColumnType("nvarchar(255)");
             e.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(500).IsRequired().HasColumnType("nvarchar(500)");
-            e.Property(x => x.PasswordSalt).HasColumnName("password_salt").HasMaxLength(500).IsRequired().HasColumnType("nvarchar(500)");
             e.Property(x => x.FailedAttempts).HasColumnName("failed_attempts").HasDefaultValue(0);
             e.Property(x => x.LockedUntil).HasColumnName("locked_until").HasColumnType("datetime2(3)");
             e.Property(x => x.LastLoginAt).HasColumnName("last_login_at").HasColumnType("datetime2(3)");
@@ -265,8 +263,6 @@ public class AppDbContext : DbContext
             e.ToTable("email_log");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
-            e.Property(x => x.OrderId).HasColumnName("order_id").HasColumnType("bigint");
-            e.Property(x => x.VariantId).HasColumnName("variant_id").HasColumnType("bigint");
             e.Property(x => x.Recipient).HasColumnName("recipient").HasMaxLength(200).IsRequired().HasColumnType("varchar(200)");
             e.Property(x => x.Template).HasColumnName("template").HasMaxLength(50).IsRequired().HasColumnType("varchar(50)");
             e.Property(x => x.Status).HasColumnName("status").HasColumnType("tinyint").HasDefaultValue(EmailStatus.Pending);
@@ -274,7 +270,6 @@ public class AppDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
 
             e.HasIndex(x => new { x.Status, x.CreatedAt });
-            e.HasIndex(x => x.OrderId);
         });
 
         modelBuilder.Entity<Exchange>(e =>
@@ -297,21 +292,6 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.NewVariant).WithMany().HasForeignKey(x => x.NewVariantId).OnDelete(DeleteBehavior.NoAction);
 
             e.HasIndex(x => x.OrderId);
-        });
-
-        modelBuilder.Entity<IdempotencyKey>(e =>
-        {
-            e.ToTable("idempotency_key");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("id").HasColumnType("bigint");
-            e.Property(x => x.Key).HasColumnName("key").HasMaxLength(255).IsRequired().HasColumnType("nvarchar(255)");
-            e.Property(x => x.RequestHash).HasColumnName("request_hash").HasMaxLength(64).HasColumnType("nvarchar(64)");
-            e.Property(x => x.ResponseStatus).HasColumnName("response_status");
-            e.Property(x => x.ResponseBody).HasColumnName("response_body").HasColumnType("nvarchar(max)");
-            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2(3)").HasDefaultValueSql("SYSUTCDATETIME()");
-            e.Property(x => x.ExpiresAt).HasColumnName("expires_at").HasColumnType("datetime2(3)").IsRequired();
-
-            e.HasIndex(x => x.Key).IsUnique();
         });
 
         var seedDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);

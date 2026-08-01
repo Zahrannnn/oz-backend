@@ -2,10 +2,10 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Oz.Api.DTOs;
 using Oz.Api.Services;
 using Oz.Domain.Entities;
-using Oz.Domain.Repositories;
 using Oz.Infrastructure.Data;
 
 namespace Oz.Api.Controllers;
@@ -16,13 +16,11 @@ namespace Oz.Api.Controllers;
 [Route("api/v1/admin/[controller]")]
 public class SchoolsController : ControllerBase
 {
-    private readonly IRepository<School> _repository;
     private readonly AppDbContext _db;
     private readonly AuditLogService _auditLog;
 
-    public SchoolsController(IRepository<School> repository, AppDbContext db, AuditLogService auditLog)
+    public SchoolsController(AppDbContext db, AuditLogService auditLog)
     {
-        _repository = repository;
         _db = db;
         _auditLog = auditLog;
     }
@@ -39,7 +37,8 @@ public class SchoolsController : ControllerBase
             UpdatedAt = DateTime.UtcNow
         };
 
-        await _repository.AddAsync(school, ct);
+        _db.Schools.Add(school);
+        await _db.SaveChangesAsync(ct);
 
         var actorId = GetActorId();
         await _auditLog.WriteAsync(actorId, "school.create", "school", school.Id.ToString(),
@@ -52,15 +51,19 @@ public class SchoolsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] int page = 1, [FromQuery] int page_size = 20, CancellationToken ct = default)
     {
-        var result = await _repository.ListAsync(page, page_size, ct);
-        var dtos = result.Items.Select(s => new SchoolDto(s.Id, s.Name, s.Type, s.IsArchived, s.CreatedAt)).ToList();
-        return Ok(new { items = dtos, result.Total, result.Page, result.PageSize });
+        var total = await _db.Schools.CountAsync(ct);
+        var items = await _db.Schools
+            .Skip((page - 1) * page_size)
+            .Take(page_size)
+            .ToListAsync(ct);
+        var dtos = items.Select(s => new SchoolDto(s.Id, s.Name, s.Type, s.IsArchived, s.CreatedAt)).ToList();
+        return Ok(new { items = dtos, total, page, page_size });
     }
 
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id, CancellationToken ct)
     {
-        var school = await _repository.GetByIdAsync(id, ct);
+        var school = await _db.Schools.FindAsync(new object[] { id }, ct);
         if (school is null) return NotFound();
         var dto = new SchoolDto(school.Id, school.Name, school.Type, school.IsArchived, school.CreatedAt);
         return Ok(dto);
