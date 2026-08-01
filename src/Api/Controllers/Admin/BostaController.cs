@@ -72,7 +72,7 @@ public class BostaController : ControllerBase
             await _auditLog.WriteAsync(GetActorId(), "order.bosta_pickup", "order", id.ToString(), before, after);
 
             var trackingUrl = $"https://bosta.co/tracking/{trackingId}";
-            _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} اتعمل شحن", EmailTemplates.Wrap(
+            _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{order.OrderNumber} اتعمل شحن", EmailTemplates.Wrap(
                 "طلبك اتشحن!", "&#128666; تم الشحن",
                 $"""
                 <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 16px;">طلبك <strong>#{order.OrderNumber}</strong> اتشحن وهيوصل لك قريب.</p>

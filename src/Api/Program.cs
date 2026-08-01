@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Hangfire;
+using Microsoft.Extensions.Logging;
 using Oz.Infrastructure.Data;
 using Oz.Api.Filters;
 using Oz.Api.Middleware;
@@ -17,6 +18,14 @@ using Oz.Api.Jobs;
 using Oz.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.UseUtcTimestamp = true;
+    options.TimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
+});
 
 builder.Services.AddControllers()
     .ConfigureApiBehaviorOptions(options =>
@@ -184,6 +193,7 @@ EnvironmentValidator.Validate(builder.Configuration, app.Environment,
     app.Services.GetRequiredService<ILogger<Program>>());
 
 // Middleware pipeline
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseSecurityHeaders();
 app.UseRateLimiter();
@@ -217,7 +227,7 @@ app.MapControllers();
 // Recurring jobs
 RecurringJob.AddOrUpdate<AutoCancelOrdersJob>(
     "auto-cancel-orders",
-    job => job.ExecuteAsync(),
+    job => job.ExecuteAsync(null!),
     Cron.Daily(3));
 
 app.Run();

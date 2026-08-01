@@ -98,7 +98,7 @@ public class BostaWebhookController : ControllerBase
                 await _db.SaveChangesAsync();
                 await _auditLog.WriteAsync(Guid.Empty, "order.webhook.delivered", "order", order.Id.ToString());
 
-                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} وصل", EmailTemplates.Wrap(
+                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{order.OrderNumber} وصل", EmailTemplates.Wrap(
                     "طلبك وصل!", "&#127881; تم التوصيل",
                     $"""
                     <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 24px;">طلبك <strong>#{order.OrderNumber}</strong> اتعمل توصيل. شكراً إنك تسوقت معانا!</p>
@@ -119,7 +119,7 @@ public class BostaWebhookController : ControllerBase
                 await _db.SaveChangesAsync();
                 await _auditLog.WriteAsync(Guid.Empty, "order.webhook.cod_failed", "order", order.Id.ToString());
 
-                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} فشل دفع", EmailTemplates.Wrap(
+                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{order.OrderNumber} فشل دفع", EmailTemplates.Wrap(
                     "فشل الدفع!", "&#9888; فشل الدفع",
                     $"""
                     <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 16px;">الدفع بتاع طلبك <strong>#{order.OrderNumber}</strong> (كاش عند الاستلام) فشل.</p>
@@ -157,7 +157,7 @@ public class BostaWebhookController : ControllerBase
                 await _db.SaveChangesAsync();
                 await _auditLog.WriteAsync(Guid.Empty, "order.webhook.closed_failed", "order", order.Id.ToString());
 
-                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} ملغي", EmailTemplates.Wrap(
+                _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{order.OrderNumber} ملغي", EmailTemplates.Wrap(
                     "تم إلغاء الطلب", "&#10060; طلب ملغي",
                     $"""
                     <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 24px;">طلبك <strong>#{order.OrderNumber}</strong> اتلغى. الطلب رجع للمتجر.</p>

@@ -48,6 +48,7 @@ public class SendNotifyMeEmailsJob
             var itemName = product.ItemType?.Name ?? "Item";
 
             _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(
+                null!,
                 alert.Email,
                 "المنتج رجع في المخزون!",
                 $"""

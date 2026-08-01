@@ -152,7 +152,7 @@ public class OrdersController : ControllerBase
         </body>
         </html>
         """;
-        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{orderNumber} تم", confirmationHtml));
+        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{orderNumber} تم", confirmationHtml));
 
         return CreatedAtAction(null, null, new PlaceOrderResponse
         {
@@ -344,7 +344,7 @@ public class OrdersController : ControllerBase
             : $"{Request.Scheme}://{Request.Host}/orders/{token}";
 
         var reasonText = string.IsNullOrWhiteSpace(request.Reason) ? "طلب من العميل" : request.Reason;
-        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(order.CustomerEmail, $"#{order.OrderNumber} ملغي", EmailTemplates.Wrap(
+        _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{order.OrderNumber} ملغي", EmailTemplates.Wrap(
             "تم إلغاء الطلب", "&#10060; طلب ملغي",
             $"""
             <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 24px;">طلبك <strong>#{order.OrderNumber}</strong> اتعمل إلغاء.</p>

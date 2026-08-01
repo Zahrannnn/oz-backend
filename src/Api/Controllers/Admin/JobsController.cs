@@ -20,7 +20,7 @@ public class JobsController : ControllerBase
     [HttpPost("run-auto-cancel")]
     public async Task<IActionResult> RunAutoCancel()
     {
-        await _autoCancelJob.ExecuteAsync();
+        await _autoCancelJob.ExecuteCoreAsync();
         return Ok(new { message = "Auto-cancel job completed" });
     }
 }
