@@ -16,6 +16,8 @@ Responses:
 - 409 (out of stock): `{ "type": ".../errors/out-of-stock", "status": 409, "detail": "Variant 1 has 0 units available; requested 1.", "errors": { "items[.](variantId=1)": "out_of_stock" } }`
 - 422: invalid channel, empty items, variantId <= 0, qty <= 0
 
+Side effects: enqueues customer confirmation email and, if `ADMIN_NOTIFY_EMAIL` (env) / `Admin:NotifyEmail` (config) is set, enqueues admin new-order notification email with order summary and dashboard link.
+
 ## GET /api/v1/orders/by-token/{token}
 Response 200:
 ```json

@@ -18,11 +18,13 @@ public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IBackgroundJobClient _jobs;
+    private readonly IConfiguration _config;
 
-    public OrdersController(AppDbContext db, IBackgroundJobClient jobs)
+    public OrdersController(AppDbContext db, IBackgroundJobClient jobs, IConfiguration config)
     {
         _db = db;
         _jobs = jobs;
+        _config = config;
     }
 
     [HttpPost]
@@ -153,6 +155,36 @@ public class OrdersController : ControllerBase
         </html>
         """;
         _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, order.CustomerEmail, $"#{orderNumber} تم", confirmationHtml));
+
+        var adminNotifyEmail = _config["Admin:NotifyEmail"]
+            ?? Environment.GetEnvironmentVariable("ADMIN_NOTIFY_EMAIL");
+        if (!string.IsNullOrWhiteSpace(adminNotifyEmail))
+        {
+            var adminDashboardUrl = !string.IsNullOrWhiteSpace(frontendUrl)
+                ? $"{frontendUrl.TrimEnd('/')}/admin"
+                : $"{Request.Scheme}://{Request.Host}/admin";
+
+            var channelLabel = channel == OrderChannel.Delivery ? "توصيل" : "استلام من المتجر";
+            var itemsTableRows = string.Join("", items.Select(i =>
+            {
+                var v = variantMap[i.VariantId];
+                return $"<tr><td style=\"padding:8px 0;border-bottom:1px solid #e8dcc8;\">{v.SizeLabel}</td><td style=\"padding:8px 0;border-bottom:1px solid #e8dcc8;text-align:center;\">{i.Qty}</td><td style=\"padding:8px 0;border-bottom:1px solid #e8dcc8;text-align:left;\">{v.PriceInclVat * i.Qty:0.##} EGP</td></tr>";
+            }));
+
+            var adminHtml = EmailTemplates.Wrap(
+                "طلب جديد", $"\uD83D\uDCC4 طلب جديد #{orderNumber}",
+                $"""
+                <p style="font-size:16px;line-height:24px;color:#4d4632;margin:0 0 16px;">طلب جديد <strong>#{orderNumber}</strong> اتسجل.</p>
+                <p style="font-size:14px;line-height:20px;color:#7f765f;margin:0 0 12px;"><strong>الاسم:</strong> {customerName}<br><strong>التليفون:</strong> {customerPhone}<br><strong>القناة:</strong> {channelLabel}<br><strong>الإجمالي:</strong> {total:0.##} EGP</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;font-size:13px;color:#4d4632;margin:0 0 16px;">
+                <thead><tr><th style="padding:8px 0;border-bottom:2px solid #1f1b10;text-align:right;">المقاس</th><th style="padding:8px 0;border-bottom:2px solid #1f1b10;text-align:center;">الكمية</th><th style="padding:8px 0;border-bottom:2px solid #1f1b10;text-align:left;">السعر</th></tr></thead>
+                <tbody>{itemsTableRows}</tbody>
+                </table>
+                """,
+                "فتح لوحة التحكم", adminDashboardUrl);
+
+            _jobs.Enqueue<SendEmailJob>(j => j.ExecuteAsync(null!, adminNotifyEmail, $"#{orderNumber} طلب جديد", adminHtml));
+        }
 
         return CreatedAtAction(null, null, new PlaceOrderResponse
         {
