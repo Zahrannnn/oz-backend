@@ -160,9 +160,7 @@ public class OrdersController : ControllerBase
             ?? Environment.GetEnvironmentVariable("ADMIN_NOTIFY_EMAIL");
         if (!string.IsNullOrWhiteSpace(adminNotifyEmail))
         {
-            var adminDashboardUrl = !string.IsNullOrWhiteSpace(frontendUrl)
-                ? $"{frontendUrl.TrimEnd('/')}/admin"
-                : $"{Request.Scheme}://{Request.Host}/admin";
+            var adminDashboardUrl = "https://oz-frontend.vercel.app/admin";
 
             var channelLabel = channel == OrderChannel.Delivery ? "توصيل" : "استلام من المتجر";
             var itemsTableRows = string.Join("", items.Select(i =>
